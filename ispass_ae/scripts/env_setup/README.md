@@ -65,7 +65,7 @@ source ~/.venvs/torch_ssm_ispass/bin/activate
 
 ## Environment 3 — Falcon-H1 Models (`torch_falcon_ispass`)
 
-**Used for:** `tiiuae/Falcon-H1-1.5B-Instruct` (Hybrid SSM-Transformer). Falcon-H1 is a hybrid model that interleaves Mamba-2 SSM layers with Transformer attention layers, so it requires the same `mamba_ssm` and `causal_conv1d` CUDA kernels as Environment 2.
+**Used for:** `tiiuae/Falcon-H1-*` (Hybrid SSM-Transformer) and `Zyphra/Zamba2-*` (Hybrid SSM). Both models interleave Mamba-2 SSM layers with Transformer attention layers and require the same `mamba_ssm` and `causal_conv1d` CUDA kernels as Environment 2.
 
 ```bash
 python3 -m venv ~/.venvs/torch_falcon_ispass
@@ -96,7 +96,7 @@ python -c "import torch; print(torch.__version__); print(torch.cuda.is_available
 python -c "import transformers; print(transformers.__version__)"
 ```
 
-For Environment 2, additionally verify:
+For Environments 2 and 3, additionally verify:
 
 ```bash
 python -c "from mamba_ssm.models.mixer_seq_simple import MambaLMHeadModel; print('mamba_ssm OK')"
