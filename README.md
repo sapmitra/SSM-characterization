@@ -37,34 +37,7 @@ src/
 
 ## Environment Setup
 
-Two virtual environments are required — see [`ispass_ae/scripts/env_setup/README.md`](ispass_ae/scripts/env_setup/README.md) for full instructions.
 
-All environments use **Python 3.10** in our experiments.
-
-**Environment 1 — Transformers & HuggingFace SSMs** (Qwen2.5, Falcon-H1, Hymba, …)
-
-```bash
-python3 -m venv ~/.venvs/torch_transformers_ispass
-source ~/.venvs/torch_transformers_ispass/bin/activate
-pip install --upgrade pip
-pip install torch --index-url https://download.pytorch.org/whl/cu124
-pip install transformers==4.52.3 accelerate pandas datasets matplotlib numpy
-```
-
-**Environment 2 — Native Mamba** (`mamba_ssm` + `causal_conv1d` CUDA kernels required for `state-spaces/mamba*`)
-
-> `mamba_ssm` provides the fused selective-scan CUDA kernels and `MambaLMHeadModel` loader that the `state-spaces/mamba*` checkpoints depend on. `causal_conv1d` is a hard dependency that must match the same CUDA/PyTorch/ABI build. Pre-built wheels are used to guarantee ABI compatibility (CUDA 12 · PyTorch 2.6 · cxx11 ABI=False · Python 3.10).
-
-```bash
-python3 -m venv ~/.venvs/torch_ssm_ispass
-source ~/.venvs/torch_ssm_ispass/bin/activate
-pip install --upgrade pip
-pip install torch --index-url https://download.pytorch.org/whl/cu124
-pip install transformers==4.52.3 accelerate pandas datasets matplotlib numpy
-# Pre-built wheels pinned to CUDA 12, PyTorch 2.6, cxx11 ABI=False, Python 3.10
-pip install https://github.com/state-spaces/mamba/releases/download/v2.2.4/mamba_ssm-2.2.4+cu12torch2.6cxx11abiFALSE-cp310-cp310-linux_x86_64.whl
-pip install https://github.com/Dao-AILab/causal-conv1d/releases/download/v1.5.0.post8/causal_conv1d-1.5.0.post8+cu12torch2.6cxx11abiFALSE-cp310-cp310-linux_x86_64.whl
-```
 
 ## Running the Profiling Framework
 

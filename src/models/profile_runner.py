@@ -378,10 +378,13 @@ def mamba(seq_len: int = 64, batch_size: int = 1, device: str = 'cuda', weights:
     del model
 
 def mamba2(seq_len: int = 64, batch_size: int = 1, device: str = 'cuda', weights: str = None):
+    path = weights or 'state-spaces/mamba2-780m'
+    # Derive a compact name from the HF repo path so the model size is encoded in CSV entries
+    # e.g. 'mamba2-780m' or 'mamba2-1.3b' depending on which weights are supplied
+    model_name = path.split('/')[-1].lower()
     # model = MambaProfile('mamba2-130m', weights or 'state-spaces/mamba2-130m', device)
     # model = MambaProfile('mamba2-370m', weights or 'state-spaces/mamba2-370m', device)
-    model = MambaProfile('mamba2-780m', weights or 'state-spaces/mamba2-780m', device)
-    # model = MambaProfile('mamba2-1.3b', weights or 'state-spaces/mamba2-1.3b', device)
+    model = MambaProfile(model_name, path, device)
     model.eval_(seq_len, batch_size, NUM_RUNS, EXPORT, custom_ops)
     del model
 
@@ -412,11 +415,14 @@ def hymba(seq_len: int = 64, batch_size: int = 1, device: str = 'cuda', weights:
     del model
 
 def qwen25_instruct(seq_len: int = 8, batch_size: int = 1, device: str = 'cuda', weights: str = None):
-    model = LMProfile('qwen25-instruct', weights or 'Qwen/Qwen2.5-0.5B-Instruct', device)
+    path = weights or 'Qwen/Qwen2.5-0.5B-Instruct'
+    # Derive a compact name from the HF repo path so the model size is encoded in CSV entries
+    model_name = path.split('/')[-1].lower()  # e.g. 'qwen2.5-1.5b-instruct'
+    model = LMProfile(model_name, path, device)
     # model = LMProfile('qwen25-instruct-int4', weights or 'Qwen/Qwen2.5-0.5B-Instruct-GPTQ-Int4', device)
     # model = LMProfile('qwen25-1.5b-instruct', weights or 'Qwen/Qwen2.5-1.5B-Instruct', device)
     # model = LMProfile('qwen25-1.5b-instruct-int4', weights or 'Qwen/Qwen2.5-1.5B-Instruct-GPTQ-Int4', device)
-    
+
     model.eval_(seq_len, batch_size, NUM_RUNS, EXPORT, custom_ops)
     # model.eval_memory(seq_len, batch_size, EXPORT)
     # model.eval_memory_generation(seq_len, batch_size, EXPORT, num_new_tokens=1)
@@ -455,9 +461,11 @@ def llama3_2(seq_len: int = 64, batch_size: int = 1, device: str = 'cuda', weigh
     del model
 
 def falcon_h1(seq_len: int = 64, batch_size: int = 1, device: str = 'cuda', weights: str = None):
-    model = LMProfile('falcon-h1-0.5b', weights or 'tiiuae/Falcon-H1-0.5B-Base', device)
-    # model = LMProfile('falcon-h1-0.5b', weights or 'tiiuae/Falcon-H1-0.5B-Instruct', device)
-    # model = LMProfile('falcon-h1', weights or 'tiiuae/Falcon-H1-1.5B-Instruct', device)
+    path = weights or 'tiiuae/Falcon-H1-0.5B-Base'
+    # Derive a compact name from the HF repo path so the model size is encoded in CSV entries
+    # e.g. 'falcon-h1-0.5b-base' or 'falcon-h1-1.5b-instruct' depending on which weights are supplied
+    model_name = path.split('/')[-1].lower()
+    model = LMProfile(model_name, path, device)
     model.eval_(seq_len, batch_size, NUM_RUNS, EXPORT, custom_ops)
     del model
 

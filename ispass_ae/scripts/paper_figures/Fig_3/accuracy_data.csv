@@ -1,0 +1,16 @@
+model_name,task,accuracy
+Qwen2.5-1.5B,MMLU,61.13
+Qwen2.5-1.5B,HellaSwag,67.86
+Qwen2.5-1.5B,Winogrande,64.56
+Qwen2.5-1.5B,ARC-C,54.27
+Qwen2.5-1.5B,TruthfulQA,47.05
+Mamba2-1.3B,MMLU,36.3
+Mamba2-1.3B,HellaSwag,59.48
+Mamba2-1.3B,Winogrande,58.72
+Mamba2-1.3B,ARC-C,33.2
+Mamba2-1.3B,TruthfulQA,36.1
+Falcon-H1-1.5B,MMLU,61.81
+Falcon-H1-1.5B,HellaSwag,66.76
+Falcon-H1-1.5B,Winogrande,65.59
+Falcon-H1-1.5B,ARC-C,53.24
+Falcon-H1-1.5B,TruthfulQA,49.39

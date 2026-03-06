@@ -632,34 +632,39 @@ def profile_model (model_name,
                 del out
                 gc.collect
     
-    # # Write timing data to CSV
-    # with open(timing_csv_path, 'a', newline='') as csvfile:
-    #     fieldnames = ['model_name', 'seq_length', 'iteration', 'time_seconds', 'device', 'timestamp']
-    #     writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+    # Write timing data to CSV
+    with open(timing_csv_path, 'a', newline='') as csvfile:
+        fieldnames = ['model_name', 'seq_length', 'iteration', 'time_seconds', 'device', 'timestamp']
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         
-    #     # Write header only if file is new
-    #     if not file_exists:
-    #         writer.writeheader()
+        # Write header only if file is new
+        if not file_exists:
+            writer.writeheader()
         
-    #     # Write all timing data
-    #     writer.writerows(timing_data)
+        # Write all timing data
+        writer.writerows(timing_data)
     
-    # print(f"Timing data saved to {timing_csv_path}")
+    # Calculate and print average execution time
+    if timing_data:
+        avg_time = sum(item['time_seconds'] for item in timing_data) / len(timing_data)
+        print(f"Average execution time: {avg_time} s")
+    
+    print(f"Timing data saved to {timing_csv_path}")
 
 
     
-    print(prof.key_averages().table(sort_by="cpu_time_total", row_limit=30))
+    # print(prof.key_averages().table(sort_by="cpu_time_total", row_limit=30))
     
-    out_dir = f'{out_dir}/{model_name}'    
-    os.system(f"mkdir -p {out_dir}") 
+    # out_dir = f'{out_dir}/{model_name}'    
+    # os.system(f"mkdir -p {out_dir}") 
     
     
-    if (export): 
-        prof.export_chrome_trace(f"{out_dir}/{model_name}.json")
+    # if (export): 
+    #     prof.export_chrome_trace(f"{out_dir}/{model_name}.json")
     
 
-    filename = f"{out_dir}/{model_name}.csv"
-    _analyze_prof (prof, filename, custom)
+    # filename = f"{out_dir}/{model_name}.csv"
+    # _analyze_prof (prof, filename, custom)
 
 
 @torch.no_grad()
