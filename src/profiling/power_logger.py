@@ -5,113 +5,136 @@
  # @ Create Time: 2026-03-02 03:06:18
  # @ Description: Parses nvidia-smi power log files (power_logs/*.log) and
  #                 computes per-GPU average power draw and energy consumption.
+ #                 Exposes parse_energy_from_log() as a reusable public API used
+ #                 by profiling/eval.py.
  '''
 
-# import os
-# import csv
-# import pandas
-
-# power_data = pandas.read_csv("power.log")
-
-# gpu0 = power_data[power_data["index"] == 0]
-# gpu1 = power_data[power_data["index"] == 1]
-# gpu2 = power_data[power_data["index"] == 2]
-# gpu3 = power_data[power_data["index"] == 3]
-
-# average_power_gpu0 = gpu0[" power.draw [W]"].mean()
-# average_power_gpu1 = gpu1[" power.draw [W]"].mean()
-# average_power_gpu2 = gpu2[" power.draw [W]"].mean()
-# average_power_gpu3 = gpu3[" power.draw [W]"].mean()
-
-# average_energy_gpu0 = gpu0[" power.draw [W]"].sum()
-# average_energy_gpu1 = gpu1[" power.draw [W]"].sum()
-# average_energy_gpu2 = gpu2[" power.draw [W]"].sum()
-# average_energy_gpu3 = gpu3[" power.draw [W]"].sum()
-
-# average_memory_usage_gpu0 = gpu0[" memory.used [MiB]"].mean()
-# average_memory_usage_gpu1 = gpu1[" memory.used [MiB]"].mean()
-# average_memory_usage_gpu2 = gpu2[" memory.used [MiB]"].mean()
-# average_memory_usage_gpu3 = gpu3[" memory.used [MiB]"].mean()
-
-# print(f"GPU0: avg power = {average_power_gpu0} \t energy = {average_energy_gpu0} \t memory usage = {average_memory_usage_gpu0}")
-# print(f"GPU1: avg power = {average_power_gpu1} \t energy = {average_energy_gpu1} \t memory usage = {average_memory_usage_gpu1}")
-# print(f"GPU2: avg power = {average_power_gpu2} \t energy = {average_energy_gpu2} \t memory usage = {average_memory_usage_gpu2}")
-# print(f"GPU3: avg power = {average_power_gpu3} \t energy = {average_energy_gpu3} \t memory usage = {average_memory_usage_gpu3}")
-
 import os
-import csv
-import pandas
+import math
 import glob
+import argparse
+import pandas
 
 
-def clean_numeric(column):
+# nvidia-smi is invoked with --loop-ms=100, so each sample covers 0.1 s
+SAMPLE_INTERVAL_S = 0.1
+
+_NUMERIC_COLS = [
+    " power.draw [W]",
+    " memory.used [MiB]",
+    " utilization.memory [%]",
+    " utilization.gpu [%]",
+]
+
+
+def _clean_numeric(column):
+    """Strip unit suffixes (e.g. ' W', ' MiB', ' %') and return float Series."""
     return column.str.replace(r"[^\d.]", "", regex=True).astype(float)
 
-# Apply cleaning to all relevant columns
-numeric_columns = [" power.draw [W]", " memory.used [MiB]", " utilization.memory [%]", " utilization.gpu [%]"]
+
+def parse_energy_from_log(log_file: str, num_iterations: int) -> dict:
+    """Parse an nvidia-smi CSV power log and compute per-pass GPU energy.
+
+    Parameters
+    ----------
+    log_file : str
+        Path to the CSV log produced by nvidia-smi --format=csv --loop-ms=100.
+    num_iterations : int
+        Number of inference passes that were recorded (used to normalise energy
+        so the returned value is *per-pass* energy in Joules).
+
+    Returns
+    -------
+    dict with keys:
+        gpu{i}_energy_joules   - per-pass energy for GPU i (J)
+        gpu{i}_avg_power_watts - mean power draw for GPU i (W)
+        total_energy_joules    - sum of per-pass energy across all active GPUs (J)
+        avg_power_watts        - mean power draw across all active GPUs (W)
+    """
+    if num_iterations <= 0:
+        raise ValueError(f"num_iterations must be > 0, got {num_iterations}")
+
+    df = pandas.read_csv(log_file)
+
+    # Clean numeric columns (nvidia-smi appends unit strings)
+    for col in _NUMERIC_COLS:
+        if col in df.columns:
+            df[col] = _clean_numeric(df[col])
+
+    result = {}
+    gpu_ids = sorted(df["index"].dropna().unique().astype(int))
+
+    active_gpus = []
+    for gid in gpu_ids:
+        gpu_df = df[df["index"] == gid]
+        power_col = gpu_df[" power.draw [W]"].dropna()
+        if power_col.empty:
+            continue
+
+        energy_j = power_col.sum() * SAMPLE_INTERVAL_S / num_iterations
+        avg_power_w = power_col.mean()
+
+        if math.isnan(energy_j) or math.isnan(avg_power_w):
+            continue
+
+        result[f"gpu{gid}_energy_joules"] = energy_j
+        result[f"gpu{gid}_avg_power_watts"] = avg_power_w
+        active_gpus.append(gid)
+
+    if active_gpus:
+        result["total_energy_joules"] = sum(
+            result[f"gpu{g}_energy_joules"] for g in active_gpus
+        )
+        result["avg_power_watts"] = sum(
+            result[f"gpu{g}_avg_power_watts"] for g in active_gpus
+        ) / len(active_gpus)
+    else:
+        result["total_energy_joules"] = 0.0
+        result["avg_power_watts"] = 0.0
+
+    return result
 
 
-# power_data = pandas.read_csv("power.log")
+# ---------------------------------------------------------------------------
+# Script mode - batch-process all *.log files in a directory
+# ---------------------------------------------------------------------------
 
-# Get all log files in power_logs directory
-log_files = glob.glob("power_logs/*.log")
+def _process_all_logs(log_dir: str, num_iterations: int) -> None:
+    log_files = sorted(glob.glob(os.path.join(log_dir, "*.log")))
+    if not log_files:
+        print(f"No .log files found in {log_dir}")
+        return
 
-for log_file in sorted(log_files):
-    # Extract metadata from filename
-    filename = os.path.basename(log_file)
-    # parts = filename.replace(".log", "").split("_")
-    
-    # if len(parts) >= 4:
-    #     model_name = parts[0]
-    #     cuda_version = parts[1]
-    #     batch_size = parts[2]
-    #     seq_len = parts[3]
-    # else:
-    #     print(f"Skipping {filename} - unexpected format")
-    #     continue
-    
-    print(f"\n{'='*80}")
-    print(f"Processing: {filename}")
-    print(f"{'='*80}")
-    
-    power_data = pandas.read_csv(log_file)
-    
-    print(power_data.head())
-    
-    gpu0 = power_data[power_data["index"] == 0]
-    gpu1 = power_data[power_data["index"] == 1]
-    gpu2 = power_data[power_data["index"] == 2]
-    gpu3 = power_data[power_data["index"] == 3]
-    
-    print('GPU0')
-    print(gpu0.tail())
-    print(len(gpu0))
-    gpu0[numeric_columns] = gpu0[numeric_columns].apply(clean_numeric)
-    gpu1[numeric_columns] = gpu1[numeric_columns].apply(clean_numeric)
-    gpu2[numeric_columns] = gpu2[numeric_columns].apply(clean_numeric)
-    gpu3[numeric_columns] = gpu3[numeric_columns].apply(clean_numeric)
-    print(gpu0.head())
-    
-    
-    average_power_gpu0 = gpu0[" power.draw [W]"].mean()
-    print (average_power_gpu0)
-    average_power_gpu1 = gpu1[" power.draw [W]"].mean()
-    average_power_gpu2 = gpu2[" power.draw [W]"].mean()
-    average_power_gpu3 = gpu3[" power.draw [W]"].mean()
-    
-    ## 0.1 seconds is the sampling time 
-    ## 1000 is the number of inference runs
-    # average_energy_gpu0 = gpu0[" power.draw [W]"].sum() * 0.1 / 1000
-    # average_energy_gpu1 = gpu1[" power.draw [W]"].sum() * 0.1 / 1000
-    # average_energy_gpu2 = gpu2[" power.draw [W]"].sum() * 0.1 / 1000
-    # average_energy_gpu3 = gpu3[" power.draw [W]"].sum() * 0.1 / 1000 
+    for log_file in log_files:
+        filename = os.path.basename(log_file)
+        print(f"\n{'='*80}")
+        print(f"Processing: {filename}")
+        print(f"{'='*80}")
 
-    average_energy_gpu0 = gpu0[" power.draw [W]"].sum() * 0.1 / 50
-    average_energy_gpu1 = gpu1[" power.draw [W]"].sum() * 0.1 / 50
-    average_energy_gpu2 = gpu2[" power.draw [W]"].sum() * 0.1 / 50
-    average_energy_gpu3 = gpu3[" power.draw [W]"].sum() * 0.1 / 50
-    
-    print(f"GPU0: avg power = {average_power_gpu0:.2f} W \t energy = {average_energy_gpu0:.2f} J")
-    print(f"GPU1: avg power = {average_power_gpu1:.2f} W \t energy = {average_energy_gpu1:.2f} J")
-    print(f"GPU2: avg power = {average_power_gpu2:.2f} W \t energy = {average_energy_gpu2:.2f} J")
-    print(f"GPU3: avg power = {average_power_gpu3:.2f} W \t energy = {average_energy_gpu3:.2f} J")
+        try:
+            energy = parse_energy_from_log(log_file, num_iterations)
+        except Exception as exc:
+            print(f"  ERROR: {exc}")
+            continue
+
+        for key, val in sorted(energy.items()):
+            print(f"  {key}: {val:.4f}")
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description="Parse nvidia-smi power logs and compute per-pass GPU energy."
+    )
+    parser.add_argument(
+        "--log_dir",
+        default="power_logs",
+        help="Directory containing *.log files (default: power_logs)",
+    )
+    parser.add_argument(
+        "--num_iterations",
+        type=int,
+        default=50,
+        help="Number of inference passes recorded in each log (default: 50)",
+    )
+    args = parser.parse_args()
+    _process_all_logs(args.log_dir, args.num_iterations)

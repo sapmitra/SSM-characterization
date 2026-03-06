@@ -24,7 +24,8 @@ import time
 from typing import List
 import csv
 #from torchvision import datasets
-import pandas as pd 
+import pandas as pd
+from profiling.power_logger import parse_energy_from_log
 torch.manual_seed(1969)
 torch.set_float32_matmul_precision('high')
 torch.backends.cuda.matmul.allow_tf32 = True
@@ -1351,42 +1352,56 @@ def profile_model_generate (model_name,
 #     os.killpg(os.getpgid(process.pid), signal.SIGTERM)
 
 @torch.no_grad()
-def profile_model_energy(model_name, 
-                    model, 
-                    input_, 
-                    custom_ops_list, 
-                    num_prof_runs, 
-                    device, 
-                    dynamo = False, 
-                    out_dir = "./non-gemm-out/", 
+def profile_model_energy(model_name,
+                    model,
+                    input_,
+                    custom_ops_list,
+                    num_prof_runs,
+                    device,
+                    dynamo = False,
+                    out_dir = "./non-gemm-out/",
                     export = True):
-    
-    # Warmup phase (not recorded in energy measurements)
+    """Measure prefill-phase energy (Joules) for a transformer LM.
+
+    Runs ``max(num_prof_runs, 50)`` forward passes under nvidia-smi power
+    logging, then delegates log parsing to
+    ``profiling.power_logger.parse_energy_from_log``, and appends one row to
+    ``energy_logs/energy_data.csv``.
+
+    The raw power log is kept in ``power_logs/{model_name}_power.log``.
+    """
+    seq_len = input_['input_ids'].shape[1] if 'input_ids' in input_ else 0
+
+    power_logs_dir  = "power_logs"
+    energy_logs_dir = "energy_logs"
+    os.makedirs(power_logs_dir,  exist_ok=True)
+    os.makedirs(energy_logs_dir, exist_ok=True)
+
+    # Warmup (not recorded)
     print("Starting warmup phase...")
-    warmup_iterations = 5
-    for i in range(warmup_iterations):
+    for _ in range(5):
         out = model(**input_)
         torch.cuda.synchronize()
         del out
         gc.collect()
         torch.cuda.empty_cache()
 
-    # Start energy measurement after warmup
-    print(f"Starting energy measurement for {model_name}...")
-    power_log_file = f"power_logs/{model_name}_power.log"
-    cmd = f"nvidia-smi --query-gpu=index,power.draw,memory.used,utilization.memory,utilization.gpu --format=csv --loop-ms=100 > {power_log_file}"
+    # Measurement
+    actual_iterations = max(num_prof_runs, 50)
+    print(f"Starting energy measurement for {model_name} seq_len={seq_len} ({actual_iterations} iters)...")
+    power_log_file = os.path.join(power_logs_dir, f"{model_name}_power.log")
+    cmd = (
+        f"nvidia-smi --query-gpu=index,power.draw,memory.used,"
+        f"utilization.memory,utilization.gpu "
+        f"--format=csv --loop-ms=100 > {power_log_file}"
+    )
     process = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True, preexec_fn=os.setsid)
-    
-    # Actual measurement phase with fewer iterations
-    actual_iterations = 50  # Scale based on num_prof_runs but cap at 50
-    print(f"Running {actual_iterations} iterations for power measurement")
-    
+
+    t_start = time.perf_counter()
     try:
         for i in range(actual_iterations):
             if i % 10 == 0:
-                print(f"Energy measurement iteration {i}/{actual_iterations}")
-            
-            # Run inference
+                print(f"  iteration {i}/{actual_iterations}")
             out = model(**input_)
             torch.cuda.synchronize()
             del out
@@ -1395,13 +1410,55 @@ def profile_model_energy(model_name,
     except Exception as e:
         print(f"Error during energy measurement: {e}")
     finally:
-        # Ensure we always terminate the nvidia-smi process
+        t_end = time.perf_counter()
         os.killpg(os.getpgid(process.pid), signal.SIGTERM)
-        print(f"Energy measurement completed and saved to {power_log_file}")
-        
-        # Final cleanup
-        gc.collect()
-        torch.cuda.empty_cache()
+        time.sleep(0.5)  # let nvidia-smi flush remaining samples
+
+    duration_per_pass_s = (t_end - t_start) / actual_iterations
+
+    # Delegate log parsing to power_logger
+    energy_result = parse_energy_from_log(power_log_file, actual_iterations)
+    energy_joules = energy_result["total_energy_joules"]
+    avg_power_w   = energy_result["avg_power_watts"]
+
+    import math as _math
+    print(
+        f"[Energy] {model_name} | seq_len={seq_len} | "
+        f"{energy_joules:.4f} J/pass | "
+        f"avg power={avg_power_w:.1f} W | "
+        f"duration/pass={duration_per_pass_s*1000:.2f} ms"
+    )
+    for i in range(4):
+        ej = energy_result.get(f"gpu{i}_energy_joules", float('nan'))
+        pw = energy_result.get(f"gpu{i}_avg_power_watts", float('nan'))
+        if not _math.isnan(ej):
+            print(f"  GPU{i}: {pw:.1f} W  {ej:.4f} J/pass")
+
+    # Append structured result to CSV
+    energy_csv_path = os.path.join(energy_logs_dir, "energy_data.csv")
+    file_exists = os.path.isfile(energy_csv_path)
+    with open(energy_csv_path, 'a', newline='') as csvfile:
+        fieldnames = [
+            'model_name', 'seq_len', 'energy_joules', 'duration_per_pass_s',
+            'avg_power_watts', 'num_iterations', 'device', 'timestamp',
+        ]
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+        if not file_exists:
+            writer.writeheader()
+        writer.writerow({
+            'model_name':          model_name,
+            'seq_len':             seq_len,
+            'energy_joules':       energy_joules,
+            'duration_per_pass_s': duration_per_pass_s,
+            'avg_power_watts':     avg_power_w,
+            'num_iterations':      actual_iterations,
+            'device':              device,
+            'timestamp':           time.strftime('%Y-%m-%d %H:%M:%S'),
+        })
+    print(f"Energy data appended to {energy_csv_path}")
+
+    gc.collect()
+    torch.cuda.empty_cache()
 
 # @torch.no_grad()
 # def profile_model_mamba_energy(model_name, 
@@ -1426,45 +1483,55 @@ def profile_model_energy(model_name,
 #     os.killpg(os.getpgid(process.pid), signal.SIGTERM)
 
 @torch.no_grad()
-def profile_model_mamba_energy(model_name, 
-                    model, 
-                    input_, 
-                    custom_ops_list, 
-                    num_prof_runs, 
-                    device, 
-                    dynamo = False, 
-                    out_dir = "./non-gemm-out/", 
+def profile_model_mamba_energy(model_name,
+                    model,
+                    input_,
+                    custom_ops_list,
+                    num_prof_runs,
+                    device,
+                    dynamo = False,
+                    out_dir = "./non-gemm-out/",
                     export = True):
-    
-    fn = lambda: model(
-        input_ids=input_['input_ids'],
-    )
-    # Warmup phase (not recorded in energy measurements)
+    """Measure prefill-phase energy (Joules) for a Mamba SSM model.
+
+    Mirrors ``profile_model_energy`` but uses ``model(input_ids=...)``
+    instead of ``model(**input_)`` to match the Mamba interface.  Log
+    parsing is delegated to ``profiling.power_logger.parse_energy_from_log``.
+    Appends one row to ``energy_logs/energy_data.csv``.
+    """
+    seq_len = int(input_['input_ids'].shape[1]) if 'input_ids' in input_ else 0
+    fn = lambda: model(input_ids=input_['input_ids'])
+
+    power_logs_dir  = "power_logs"
+    energy_logs_dir = "energy_logs"
+    os.makedirs(power_logs_dir,  exist_ok=True)
+    os.makedirs(energy_logs_dir, exist_ok=True)
+
+    # Warmup (not recorded)
     print("Starting warmup phase...")
-    warmup_iterations = 5
-    for i in range(warmup_iterations):
+    for _ in range(5):
         out = fn()
         torch.cuda.synchronize()
         del out
         gc.collect()
         torch.cuda.empty_cache()
 
-    # Start energy measurement after warmup
-    print(f"Starting energy measurement for {model_name}...")
-    power_log_file = f"power_logs/{model_name}_power.log"
-    cmd = f"nvidia-smi --query-gpu=index,power.draw,memory.used,utilization.memory,utilization.gpu --format=csv --loop-ms=100 > {power_log_file}"
+    # Measurement
+    actual_iterations = max(num_prof_runs, 50)
+    print(f"Starting energy measurement for {model_name} seq_len={seq_len} ({actual_iterations} iters)...")
+    power_log_file = os.path.join(power_logs_dir, f"{model_name}_power.log")
+    cmd = (
+        f"nvidia-smi --query-gpu=index,power.draw,memory.used,"
+        f"utilization.memory,utilization.gpu "
+        f"--format=csv --loop-ms=100 > {power_log_file}"
+    )
     process = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True, preexec_fn=os.setsid)
-    
-    # Actual measurement phase with fewer iterations
-    actual_iterations = 50  # Scale based on num_prof_runs but cap at 50
-    print(f"Running {actual_iterations} iterations for power measurement")
-    
+
+    t_start = time.perf_counter()
     try:
         for i in range(actual_iterations):
             if i % 10 == 0:
-                print(f"Energy measurement iteration {i}/{actual_iterations}")
-            
-            # Run inference
+                print(f"  iteration {i}/{actual_iterations}")
             out = fn()
             torch.cuda.synchronize()
             del out
@@ -1473,13 +1540,55 @@ def profile_model_mamba_energy(model_name,
     except Exception as e:
         print(f"Error during energy measurement: {e}")
     finally:
-        # Ensure we always terminate the nvidia-smi process
+        t_end = time.perf_counter()
         os.killpg(os.getpgid(process.pid), signal.SIGTERM)
-        print(f"Energy measurement completed and saved to {power_log_file}")
-        # Final cleanup
-        gc.collect()
-        torch.cuda.empty_cache()
+        time.sleep(0.5)  # let nvidia-smi flush remaining samples
 
+    duration_per_pass_s = (t_end - t_start) / actual_iterations
+
+    # Delegate log parsing to power_logger
+    energy_result = parse_energy_from_log(power_log_file, actual_iterations)
+    energy_joules = energy_result["total_energy_joules"]
+    avg_power_w   = energy_result["avg_power_watts"]
+
+    import math as _math
+    print(
+        f"[Energy] {model_name} | seq_len={seq_len} | "
+        f"{energy_joules:.4f} J/pass | "
+        f"avg power={avg_power_w:.1f} W | "
+        f"duration/pass={duration_per_pass_s*1000:.2f} ms"
+    )
+    for i in range(4):
+        ej = energy_result.get(f"gpu{i}_energy_joules", float('nan'))
+        pw = energy_result.get(f"gpu{i}_avg_power_watts", float('nan'))
+        if not _math.isnan(ej):
+            print(f"  GPU{i}: {pw:.1f} W  {ej:.4f} J/pass")
+
+    # Append structured result to CSV
+    energy_csv_path = os.path.join(energy_logs_dir, "energy_data.csv")
+    file_exists = os.path.isfile(energy_csv_path)
+    with open(energy_csv_path, 'a', newline='') as csvfile:
+        fieldnames = [
+            'model_name', 'seq_len', 'energy_joules', 'duration_per_pass_s',
+            'avg_power_watts', 'num_iterations', 'device', 'timestamp',
+        ]
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+        if not file_exists:
+            writer.writeheader()
+        writer.writerow({
+            'model_name':          model_name,
+            'seq_len':             seq_len,
+            'energy_joules':       energy_joules,
+            'duration_per_pass_s': duration_per_pass_s,
+            'avg_power_watts':     avg_power_w,
+            'num_iterations':      actual_iterations,
+            'device':              device,
+            'timestamp':           time.strftime('%Y-%m-%d %H:%M:%S'),
+        })
+    print(f"Energy data appended to {energy_csv_path}")
+
+    gc.collect()
+    torch.cuda.empty_cache()
 
 
 def profile_model_dynamo_generate (model_name, 

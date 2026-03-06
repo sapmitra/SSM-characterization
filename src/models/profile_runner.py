@@ -295,6 +295,13 @@ class LMProfile:
         inputs = self.tokenizer(prompt, return_tensors='pt').to(self.device)
         return memory_usage_decode(self.model_name, self.model, inputs, self.device, output_seq_len=output_seq_len, input_seq_len=seq_len)
 
+    def eval_energy(self, seq_len: int = 1024, batch_size: int = 1, num_runs: int = NUM_RUNS, export: bool = EXPORT, custom_ops=custom_ops, inputs=None):
+        """Measure prefill-phase energy (J) via nvidia-smi and save to energy_logs/energy_data.csv."""
+        self.model_name = f'{self.model_name}_{self.device}_{batch_size}_{seq_len}'
+        prompt = gen_random_prompt(seq_len)
+        inputs = self.tokenizer(prompt, return_tensors='pt').to(self.device)
+        profile_model_energy(self.model_name, self.model, inputs, custom_ops, num_runs, self.device, False, out_dir, export)
+
 
 class MambaProfile:
     def __init__(self, model_name: str = 'mamba', model_config: str = 'mamba', device: str = 'cuda'):
@@ -335,6 +342,14 @@ class MambaProfile:
         inputs = self.tokenizer(prompt, return_tensors='pt').to(self.device)
 
         profile_model_mamba_generate(self.model_name, self.model, inputs, custom_ops, num_runs, self.device, max_num_tokens, False, out_dir, export)
+
+    def eval_energy(self, seq_len: int = 1024, batch_size: int = 1, num_runs: int = NUM_RUNS, export: bool = EXPORT, custom_ops=custom_ops, inputs=None):
+        """Measure prefill-phase energy (J) via nvidia-smi and save to energy_logs/energy_data.csv."""
+        self.model_name = f'{self.model_name}_{self.device}_{batch_size}_{seq_len}'
+        prompt = gen_random_prompt(seq_len)
+        inputs = self.tokenizer(prompt, return_tensors='pt').to(self.device)
+        self.model.eval()
+        profile_model_mamba_energy(self.model_name, self.model, inputs, custom_ops, num_runs, self.device, False, out_dir, export)
 
 # for evaluating Zamba2 please enable seperate virtual env with transformers>=4.48.0
 # class Zamba2Profile:
@@ -476,6 +491,30 @@ def falcon_h1_generate(seq_len: int = 8, max_num_tokens: int = 1, device: str = 
     model.eval_gen_(seq_len, max_num_tokens, NUM_RUNS, EXPORT, custom_ops)
     del model
 
+def qwen25_instruct_energy(seq_len: int = 1024, device: str = 'cuda', weights: str = None):
+    """Profile prefill-phase energy for Qwen2.5-0.5B-Instruct."""
+    path = weights or 'Qwen/Qwen2.5-0.5B-Instruct'
+    model_name = path.split('/')[-1].lower()
+    model = LMProfile(model_name, path, device)
+    model.eval_energy(seq_len, 1, NUM_RUNS, EXPORT, custom_ops)
+    del model
+
+def mamba2_energy(seq_len: int = 1024, device: str = 'cuda', weights: str = None):
+    """Profile prefill-phase energy for Mamba2-780m."""
+    path = weights or 'state-spaces/mamba2-780m'
+    model_name = path.split('/')[-1].lower()
+    model = MambaProfile(model_name, path, device)
+    model.eval_energy(seq_len, 1, NUM_RUNS, EXPORT, custom_ops)
+    del model
+
+def falcon_h1_energy(seq_len: int = 1024, device: str = 'cuda', weights: str = None):
+    """Profile prefill-phase energy for Falcon-H1-0.5B-Base."""
+    path = weights or 'tiiuae/Falcon-H1-0.5B-Base'
+    model_name = path.split('/')[-1].lower()
+    model = LMProfile(model_name, path, device)
+    model.eval_energy(seq_len, 1, NUM_RUNS, EXPORT, custom_ops)
+    del model
+
 def nemotron_flash(seq_len: int = 64, batch_size: int = 1, device: str = 'cuda', weights: str = None):
     model = LMProfile('nemotron-flash-1b', weights or 'nvidia/Nemotron-Flash-1B', device)
     model.eval_(seq_len, batch_size, NUM_RUNS, EXPORT, custom_ops)
@@ -500,6 +539,10 @@ profiling_functions = {
     'hymba': hymba,
     'falcon-h1': falcon_h1,
     'nemotron-flash': nemotron_flash,
+    # Energy profiling functions (Fig 6a)
+    'qwen25-instruct-energy': qwen25_instruct_energy,
+    'mamba2-energy': mamba2_energy,
+    'falcon-h1-energy': falcon_h1_energy,
 }
 
 def parse_arguments(): 
