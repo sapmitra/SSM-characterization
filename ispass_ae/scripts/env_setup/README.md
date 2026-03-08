@@ -189,6 +189,14 @@ pip install "https://pypi.jetson-ai-lab.io/jp6/cu126/+f/28a/11e19b7f9fd56/causal
 pip install "https://pypi.jetson-ai-lab.io/jp6/cu126/+f/9da/4bcb8e8f0eba0/triton-3.4.0-cp310-cp310-linux_aarch64.whl#sha256=9da4bcb8e8f0eba00a097ad8c57b26102add499e520d67fb2d5362bebf976ca3"
 ```
 
+### Hymba — Additional Packages
+
+`nvidia/Hymba-*` additionally requires FlashAttention pre-built for JetPack 6.2 / aarch64:
+
+```bash
+pip install "https://pypi.jetson-ai-lab.io/jp6/cu126/+f/c90/358c76ebceadc/flash_attn-2.8.2-cp310-cp310-linux_aarch64.whl#sha256=c90358c76ebceadcd8aef5cf3746ef0026ea05a34688c401f6ab2ee1a6fee19a"
+```
+
 #### Activate
 
 ```bash
