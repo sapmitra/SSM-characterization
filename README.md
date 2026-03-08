@@ -10,7 +10,7 @@
 **ISPASS 2026 — Artifact Evaluation**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Python 3.10](https://img.shields.io/badge/Python-3.10-blue.svg)](https://www.python.org/downloads/release/python-310/)
+[![Python 3.10](https://img.shields.io/badge/Python-3.10-blue.svg)](https://www.python.org/downloads/release/python-31020/)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.6%2B-ee4c2c.svg)](https://pytorch.org/)
 [![CUDA](https://img.shields.io/badge/CUDA-12.x-76b900.svg)](https://developer.nvidia.com/cuda-toolkit)
 [![arXiv](https://img.shields.io/badge/arXiv-2507.12442-b31b1b.svg)](https://arxiv.org/abs/2507.12442)
@@ -158,11 +158,6 @@ python -m models.profile_runner --model_name mamba2 --batch_size 1 --seq_len 102
 # Memory footprint sweep
 python -m memory.mem_footprint
 
-# vLLM OOM boundary sweep
-python -m memory.vllm_oom
-
-# Figure generation from existing CSVs
-python -m visualization.gen_figure_data
 ```
 
 ---
