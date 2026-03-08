@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 250" width="100%" height="100%">
+  <defs>
+    <linearGradient id="gradBlue" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0064A4" />
+      <stop offset="100%" stop-color="#00B0FF" />
+    </linearGradient>
+    
+    <linearGradient id="gradGold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFD200" />
+      <stop offset="100%" stop-color="#FF8C00" />
+    </linearGradient>
+
+    <clipPath id="scopeClip">
+      <circle cx="120" cy="120" r="76" />
+    </clipPath>
+
+    <style>
+      .text-main { 
+        font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; 
+        font-size: 76px; 
+      }
+      .text-bold { font-weight: 800; fill: #24292f; }
+      .text-thin { font-weight: 300; fill: #24292f; }
+      
+      .text-sub { 
+        font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace; 
+        font-size: 19px; 
+        font-weight: 600; 
+        fill: #0064A4; 
+        letter-spacing: 4px; 
+      }
+      
+      .line-raw { stroke: #24292f; }
+      .grid-line { stroke: #24292f; }
+
+      @media (prefers-color-scheme: dark) {
+        .text-bold { fill: #c9d1d9; }
+        .text-thin { fill: #c9d1d9; }
+        .text-sub { fill: #00B0FF; }
+        .line-raw { stroke: #c9d1d9; }
+        .grid-line { stroke: #8b949e; }
+      }
+    </style>
+  </defs>
+
+  <g transform="translate(30, 5)">
+    <path d="M 0 120 L 44 120" fill="none" class="line-raw" stroke-width="4" stroke-linecap="round" />
+    <path d="M 196 120 L 250 120" fill="none" class="line-raw" stroke-width="4" stroke-linecap="round" />
+
+    <g clip-path="url(#scopeClip)">
+      <path d="M 44 70 L 196 70 M 44 100 L 196 100 M 44 140 L 196 140 M 44 170 L 196 170" class="grid-line" stroke-width="1" opacity="0.2" stroke-dasharray="4 4" />
+      <path d="M 70 44 L 70 196 M 100 44 L 100 196 M 140 44 L 140 196 M 170 44 L 170 196" class="grid-line" stroke-width="1" opacity="0.2" stroke-dasharray="4 4" />
+      
+      <rect x="68" y="130" width="14" height="60" fill="url(#gradBlue)" opacity="0.6" rx="3" />
+      <rect x="94" y="90" width="14" height="100" fill="url(#gradBlue)" opacity="0.9" rx="3" />
+      <rect x="120" y="70" width="14" height="120" fill="url(#gradBlue)" opacity="0.5" rx="3" />
+      <rect x="146" y="110" width="14" height="80" fill="url(#gradBlue)" opacity="0.8" rx="3" />
+      
+      <path d="M 40 120 C 70 40, 85 200, 120 120 C 155 40, 170 200, 200 120" fill="none" stroke="url(#gradGold)" stroke-width="9" stroke-linecap="round" />
+      
+      <circle cx="120" cy="120" r="6" fill="#24292f" stroke="#FFD200" stroke-width="3" />
+    </g>
+
+    <circle cx="120" cy="120" r="80" fill="none" stroke="url(#gradBlue)" stroke-width="10" />
+    
+    <circle cx="120" cy="120" r="64" fill="none" stroke="#00B0FF" stroke-width="2" stroke-dasharray="5 8" opacity="0.6" />
+
+    <line x1="120" y1="20" x2="120" y2="45" stroke="#00B0FF" stroke-width="6" stroke-linecap="round" />
+    <line x1="120" y1="195" x2="120" y2="220" stroke="#00B0FF" stroke-width="6" stroke-linecap="round" />
+    <line x1="20" y1="120" x2="45" y2="120" stroke="#00B0FF" stroke-width="6" stroke-linecap="round" />
+    <line x1="195" y1="120" x2="220" y2="120" stroke="#00B0FF" stroke-width="6" stroke-linecap="round" />
+  </g>
+
+  <text x="310" y="135" class="text-main">
+    <tspan class="text-bold">SSM-</tspan><tspan class="text-thin">Scope</tspan>
+  </text>
+  <text x="315" y="175" class="text-sub">PERFORMANCE CHARACTERIZATION</text>
+</svg>

@@ -1,5 +1,5 @@
 <p align="center">
-  <img src=".github/logo1.svg" alt="SSM-Characterization Logo" width="600">
+  <img src=".github/logo2.svg" alt="SSM-Characterization Logo" width="600">
 </p>
 <div align="center">
 <!-- 
