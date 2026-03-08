@@ -16,12 +16,16 @@ require the Transformer venv; Mamba2 requires the Mamba venv.
 
 Usage (from ``<repo_root>/src/``):
 
-    # --- Transformer venv -----------------------------------------------
+    # --- Transformer venv (Qwen2.5-0.5B-Instruct) ---------------------------
     source ~/.venvs/torch_transformers_ispass/bin/activate
     cd <repo_root>/src
 
     python ../ispass_ae/scripts/paper_figures/Fig_6b/collect_fig6b_data.py \\
         --model qwen --seq_len 1024 --max_new_tokens 256 --device cuda
+
+    # --- Falcon venv (Falcon-H1-0.5B) ----------------------------------------
+    source ~/.venvs/torch_falcon_ispass/bin/activate
+    cd <repo_root>/src
 
     python ../ispass_ae/scripts/paper_figures/Fig_6b/collect_fig6b_data.py \\
         --model falcon --seq_len 1024 --max_new_tokens 256 --device cuda

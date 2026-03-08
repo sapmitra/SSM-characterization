@@ -34,6 +34,7 @@ THROUGHPUT_CSV="${REPO_ROOT}/src/throughput_logs/generation_times.csv"
 OUT_DIR="${SCRIPT_DIR}"
 
 TRANSFORMER_VENV="${HOME}/.venvs/torch_transformers_ispass"
+FALCON_VENV="${HOME}/.venvs/torch_falcon_ispass"
 MAMBA_VENV="${HOME}/.venvs/torch_ssm_ispass"
 
 SEQ_LENGTHS=(1024 2048 4096 8192 16384 24576 32768)
@@ -74,8 +75,8 @@ deactivate
 
 # ---------------------------------------------------------------------------
 echo ""
-echo "=== Step 1c: Falcon-H1-0.5B-Base — Transformer venv ==="
-source "${TRANSFORMER_VENV}/bin/activate"
+echo "=== Step 1c: Falcon-H1-0.5B-Base — Falcon venv ==="
+source "${FALCON_VENV}/bin/activate"
 cd "${REPO_ROOT}/src"
 
 for SEQ in "${SEQ_LENGTHS[@]}"; do

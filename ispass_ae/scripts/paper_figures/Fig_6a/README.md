@@ -40,7 +40,6 @@ across 10 sequence lengths:
 | `gen_fig6a.sh` | End-to-end bash script — collects data and plots the figure in one command |
 | `collect_fig6a_data.py` | Profiles one model at one sequence length and writes energy (J) to CSV |
 | `plot_fig6a.py` | Reads the CSV and generates publication-quality PNGs |
-| `README.md` | This file |
 > **Power log parsing** is handled internally by
 > [`src/profiling/power_logger.py`](../../../../src/profiling/power_logger.py).
 > That module exposes ``parse_energy_from_log(log_file, num_iterations)``
@@ -113,10 +112,10 @@ for SEQ_LEN in 1024 2048 4096 8192 16384 24576 32768 40960 49152 57344; do
 done
 ```
 
-### 1c. Falcon-H1-0.5B-Base — Transformer venv
+### 1c. Falcon-H1-0.5B-Base — Falcon venv
 
 ```bash
-source ~/.venvs/torch_transformers_ispass/bin/activate
+source ~/.venvs/torch_falcon_ispass/bin/activate
 cd <repo_root>/src
 
 for SEQ_LEN in 1024 2048 4096 8192 16384 24576 32768 40960 49152 57344; do

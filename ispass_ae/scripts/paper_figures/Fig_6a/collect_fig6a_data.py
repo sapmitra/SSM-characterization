@@ -19,12 +19,16 @@ virtual environment active.
 
 Usage (from ``<repo_root>/src/``):
 
-    # --- Transformer venv (Qwen2.5-0.5B-Instruct & Falcon-H1-0.5B) --------
+    # --- Transformer venv (Qwen2.5-0.5B-Instruct) ---------------------------
     source ~/.venvs/torch_transformers_ispass/bin/activate
     cd <repo_root>/src
 
     python ../ispass_ae/scripts/paper_figures/Fig_6a/collect_fig6a_data.py \\
         --model qwen --seq_len 1024 --device cuda
+
+    # --- Falcon venv (Falcon-H1-0.5B) ----------------------------------------
+    source ~/.venvs/torch_falcon_ispass/bin/activate
+    cd <repo_root>/src
 
     python ../ispass_ae/scripts/paper_figures/Fig_6a/collect_fig6a_data.py \\
         --model falcon --seq_len 1024 --device cuda

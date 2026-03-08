@@ -79,10 +79,10 @@ for SEQ in 1024 2048 4096 8192 16384 24576 32768; do
 done
 ```
 
-### 1c. Falcon-H1-0.5B-Base — Transformer venv
+### 1c. Falcon-H1-0.5B-Base — Falcon venv
 
 ```bash
-source ~/.venvs/torch_transformers_ispass/bin/activate
+source ~/.venvs/torch_falcon_ispass/bin/activate
 cd <repo_root>/src
 
 for SEQ in 1024 2048 4096 8192 16384 24576 32768; do
