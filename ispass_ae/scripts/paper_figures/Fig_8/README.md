@@ -2,8 +2,7 @@
 
 > **Tip:** The interactive notebook at
 > [`ssm_hybrid_op_breakdown.ipynb`](../../../notebooks/ssm_hybrid_op_breakdown.ipynb)
-> can regenerate the figure directly from pre-existing profiling data. The profiling data is not present in
-> `profile_data/` because of storage constraints.
+> can regenerate the figure directly from pre-existing profiling data in `profile_data/`
 
 > **Quick start:** Run the script from the repo root (or from this directory)
 > to collect all data and generate the figure in one step:
