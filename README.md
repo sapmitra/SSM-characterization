@@ -146,6 +146,20 @@ Raw profiling CSVs are included — figures can be reproduced without re-running
 
 ---
 
+## 🔍 Chrome Trace Visualization
+
+Several profiling runs export Chrome trace files (`.json`) alongside the CSV summaries, located under [`profile_data/`](profile_data/) and [`profile_data_jetson/`](profile_data_jetson/) (e.g. `profile_data/gpt-neo-125m_cuda_1_1024/gpt-neo-125m_cuda_1_1024.json`).
+
+To inspect them:
+
+1. Open **[Perfetto UI](https://ui.perfetto.dev)** in your browser — no installation required.
+2. Click **Open trace file** and select any `.json` trace.
+3. Alternatively, navigate to `chrome://tracing` in a Chromium-based browser and load the file there.
+
+The traces show per-kernel GPU timelines and are useful for understanding operator overlap, launch overhead, and memory transfer patterns beyond what the CSV summaries capture.
+
+---
+
 ## Running the Profiling Framework
 
 All scripts are run from within the `src/` directory:
