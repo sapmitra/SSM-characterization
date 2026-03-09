@@ -36,10 +36,38 @@ PROFILE_DATA_DIR="${REPO_ROOT}/src/profile_logs"
 
 OUT_DIR="${SCRIPT_DIR}"
 
-MAMBA_VENV="${HOME}/.venvs/torch_ssm_ispass"
+# ---------------------------------------------------------------------------
+# Jetson detection — presence of /etc/nv_tegra_release identifies a Jetson board.
+# Override with IS_JETSON=1 or IS_JETSON=0 to force a specific behaviour.
+# On Jetson the venvs live under /data/.venvs/ (larger storage partition);
+# on a desktop workstation they live under ~/.venvs/.
+# ---------------------------------------------------------------------------
+if [[ -z "${IS_JETSON:-}" ]]; then
+    if [[ -f /etc/nv_tegra_release ]]; then
+        IS_JETSON=1
+    else
+        IS_JETSON=0
+    fi
+fi
+
+if [[ "${IS_JETSON}" == "1" ]]; then
+    VENV_BASE="/data/.venvs"
+else
+    VENV_BASE="${HOME}/.venvs"
+fi
+
+MAMBA_VENV="${VENV_BASE}/torch_ssm_ispass"
 
 # Sequence lengths for Jetson Nano (up to 32 768 tokens)
 SEQ_LENGTHS=(256 512 1024 2048 4096 8192 16384 32768)
+
+# ---------------------------------------------------------------------------
+echo ""
+echo "┌──────────────────────────────────────────────────────────────┐"
+echo "│  Fig 9a — SSM Operator Breakdown (Jetson seq lengths)        │"
+echo "│  profile_data   : ${PROFILE_DATA_DIR}"
+echo "│  is_jetson      : ${IS_JETSON}  (venvs: ${VENV_BASE})"
+echo "└──────────────────────────────────────────────────────────────┘"
 
 # ---------------------------------------------------------------------------
 echo ""

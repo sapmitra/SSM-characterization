@@ -16,9 +16,11 @@
 > chmod +x gen_fig9a.sh
 > bash gen_fig9a.sh
 > ```
-> The script activates the correct venv automatically, runs all 16 profiling
-> jobs (2 models × 8 sequence lengths), and writes the output PNGs to this
-> directory.  Profile CSVs are stored in `src/profile_logs/`.
+> The script auto-detects the platform via `/etc/nv_tegra_release` and sources
+> the venv from `~/.venvs/` on a desktop or `/data/.venvs/` on Jetson.
+> Override with `IS_JETSON=1` or `IS_JETSON=0` if auto-detection fails.
+> Runs all 16 profiling jobs (2 models × 8 sequence lengths) and writes the
+> output PNGs to this directory.  Profile CSVs are stored in `src/profile_logs/`.
 
 #### For detailed step-by-step instructions see the rest of this README.
 
@@ -66,6 +68,13 @@ Jetson Nano unified memory budget.
 All commands are run from `<repo_root>/src/`.  Only the **Mamba venv** is
 needed because both models use `mamba_ssm`.
 
+> **Venv location:**
+> - Desktop: `~/.venvs/torch_ssm_ispass`
+> - Jetson:  `/data/.venvs/torch_ssm_ispass`
+>
+> `gen_fig9a.sh` resolves this automatically.  For the manual steps below,
+> substitute the correct base path for your platform.
+
 ### Sequence lengths
 
 8 sequence lengths are profiled for each model:
@@ -74,7 +83,10 @@ needed because both models use `mamba_ssm`.
 ### 1a. Profile mamba-130m
 
 ```bash
+# Desktop
 source ~/.venvs/torch_ssm_ispass/bin/activate
+# Jetson
+# source /data/.venvs/torch_ssm_ispass/bin/activate
 cd <repo_root>/src
 
 for SEQ_LEN in 256 512 1024 2048 4096 8192 16384 32768; do
@@ -105,6 +117,8 @@ done
 
 ```bash
 # from repo root, any venv with matplotlib + pandas
+# Desktop: source ~/.venvs/torch_ssm_ispass/bin/activate
+# Jetson:  source /data/.venvs/torch_ssm_ispass/bin/activate
 source ~/.venvs/torch_ssm_ispass/bin/activate
 
 python ispass_ae/scripts/paper_figures/Fig_9a/plot_fig9a.py \

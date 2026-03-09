@@ -6,21 +6,22 @@
 # on two hardware platforms: Desktop GPU and NVIDIA Jetson Orin Nano.
 #
 # ─── Quick start ────────────────────────────────────────────────────────────
-# From repo root:
+# Desktop only (profiles + plots in one step):
 #   bash ispass_ae/scripts/paper_figures/Fig_9b/gen_fig9b.sh
-#
-# From this directory:
-#   bash gen_fig9b.sh
+#   # Or from this directory: bash gen_fig9b.sh
 # ────────────────────────────────────────────────────────────────────────────
 #
 # ─── Two-device workflow ────────────────────────────────────────────────────
-# Step A — Desktop (this script, default settings):
+# Step A — Desktop (collect + plot once Jetson data is merged):
 #   bash gen_fig9b.sh
 #   # Profiles all models → src/profile_logs/
+#   # Venvs resolved from ~/.venvs/  (auto-detected)
 #
-# Step B — Jetson (run on the Jetson board, skip the plot):
+# Step B — Jetson (collect only, skip the plot):
 #   SKIP_PLOT=1 bash gen_fig9b.sh
 #   # Profiles all models → src/profile_logs/
+#   # Venvs resolved from /data/.venvs/  (auto-detected via /etc/nv_tegra_release)
+#   # Override: IS_JETSON=1 bash gen_fig9b.sh  (force Jetson venv paths)
 #
 # Step C — Transfer Jetson data to workstation:
 #   rsync -avz jetson:~/path/to/repo/src/profile_logs/ \
@@ -72,10 +73,30 @@ SKIP_PLOT="${SKIP_PLOT:-0}"
 # Output directory (PNGs are saved here).
 OUT_DIR="${SCRIPT_DIR}"
 
+# ---------------------------------------------------------------------------
+# Jetson detection — presence of /etc/nv_tegra_release identifies a Jetson board.
+# Override with IS_JETSON=1 or IS_JETSON=0 to force a specific behaviour.
+# On Jetson the venvs live under /data/.venvs/ (larger storage partition);
+# on a desktop workstation they live under ~/.venvs/.
+# ---------------------------------------------------------------------------
+if [[ -z "${IS_JETSON:-}" ]]; then
+    if [[ -f /etc/nv_tegra_release ]]; then
+        IS_JETSON=1
+    else
+        IS_JETSON=0
+    fi
+fi
+
+if [[ "${IS_JETSON}" == "1" ]]; then
+    VENV_BASE="/data/.venvs"
+else
+    VENV_BASE="${HOME}/.venvs"
+fi
+
 # Virtual environments
-TRANSFORMER_VENV="${HOME}/.venvs/torch_transformers_ispass"
-MAMBA_VENV="${HOME}/.venvs/torch_ssm_ispass"
-FALCON_VENV="${HOME}/.venvs/torch_falcon_ispass"
+TRANSFORMER_VENV="${VENV_BASE}/torch_transformers_ispass"
+MAMBA_VENV="${VENV_BASE}/torch_ssm_ispass"
+FALCON_VENV="${VENV_BASE}/torch_falcon_ispass"
 
 mkdir -p "${PROFILE_DATA_DIR}"
 
@@ -85,6 +106,7 @@ echo "│  Fig 9b — Cross-Device Operator Breakdown                    │"
 echo "│  seq_len        : ${SEQ_LEN}"
 echo "│  profile_data   : ${PROFILE_DATA_DIR}"
 echo "│  skip_plot      : ${SKIP_PLOT}"
+echo "│  is_jetson      : ${IS_JETSON}  (venvs: ${VENV_BASE})"
 echo "└──────────────────────────────────────────────────────────────┘"
 
 # ---------------------------------------------------------------------------

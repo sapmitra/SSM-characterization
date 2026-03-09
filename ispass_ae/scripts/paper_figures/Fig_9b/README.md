@@ -6,7 +6,7 @@
 > `profile_data/` (desktop) and `profile_data_jetson/` (Jetson) without
 > running any new inference.
 
-> ⚡ **Quick start (desktop collection + plot):**
+> ⚡ **Quick start — Desktop only (collect + plot in one step):**
 > ```bash
 > # From repo root
 > chmod +x ispass_ae/scripts/paper_figures/Fig_9b/gen_fig9b.sh
@@ -16,11 +16,44 @@
 > chmod +x gen_fig9b.sh
 > bash gen_fig9b.sh
 > ```
-> The script activates the correct venv for each model family, profiles all
-> nine models at seq_len=1024, and writes the output PNG to this directory.
+> The script auto-detects the platform, activates the correct venv for each
+> model family (from `~/.venvs/` on desktop), profiles all nine models at
+> seq_len=1024, and writes the output PNG to this directory.
 > Profile CSVs are stored in `src/profile_logs/`.
 
-> **Two-device workflow** (Desktop + Jetson):  See [Step 2 — Jetson](#step-2--collect-jetson-data) below.
+> 🖥️↔️🤖 **Quick start — Two-device workflow (Desktop + Jetson):**
+>
+> **Step A — Desktop** (collect desktop data):
+> ```bash
+> bash ispass_ae/scripts/paper_figures/Fig_9b/gen_fig9b.sh
+> # Venvs auto-resolved from ~/.venvs/
+> # Profile CSVs → src/profile_logs/
+> ```
+>
+> **Step B — Jetson** (collect Jetson data, skip plot):
+> ```bash
+> # Run on the Jetson board — venvs are auto-resolved from /data/.venvs/
+> SKIP_PLOT=1 bash ispass_ae/scripts/paper_figures/Fig_9b/gen_fig9b.sh
+> # Profile CSVs → src/profile_logs/
+> ```
+> > The script detects Jetson automatically via `/etc/nv_tegra_release`.
+> > To override: `IS_JETSON=1 SKIP_PLOT=1 bash gen_fig9b.sh`
+>
+> **Step C — Transfer** Jetson CSVs to the workstation:
+> ```bash
+> rsync -avz jetson:<repo_root>/src/profile_logs/ \
+>           <local_repo_root>/src/profile_logs_jetson/
+> ```
+>
+> **Step D — Plot** on the workstation (after transfer):
+> ```bash
+> source ~/.venvs/torch_transformers_ispass/bin/activate
+> cd <repo_root>
+> python ispass_ae/scripts/paper_figures/Fig_9b/plot_fig9b.py
+> ```
+> Output PNG: `ispass_ae/scripts/paper_figures/Fig_9b/fig9b_device_comparison_seq1024.png`
+
+> **Detailed step-by-step instructions** (Desktop + Jetson):  See [Step 2 — Jetson](#step-2--collect-jetson-data) below.
 
 #### For detailed step-by-step instructions see the rest of this README.
 
@@ -80,11 +113,15 @@ Execution time is decomposed into the same operator categories used in
 Three Python virtual environments are required.  All must have PyTorch and
 the `torch_profiler` utilities from this repository installed.
 
-| venv                        | Models                                                  | Extra requirement          |
-|-----------------------------|---------------------------------------------------------|----------------------------|
-| `~/.venvs/torch_transformers_ispass` | GPT-Neo, TinyLlama, LLaMA-3.2, Qwen2.5-0.5B, Qwen2.5-1.5B | standard HF Transformers |
-| `~/.venvs/torch_ssm_ispass`          | Mamba-130m, Mamba2-130m                          | `mamba_ssm`               |
-| `~/.venvs/torch_falcon_ispass`       | Hymba-1.5B, Zamba2-1.2B                          | `mamba_ssm` + `transformers>=4.48` |
+| venv name | Desktop path | Jetson path | Models | Extra requirement |
+|-----------|-------------|-------------|--------|-------------------|
+| `torch_transformers_ispass` | `~/.venvs/` | `/data/.venvs/` | GPT-Neo, TinyLlama, LLaMA-3.2, Qwen2.5-0.5B, Qwen2.5-1.5B | standard HF Transformers |
+| `torch_ssm_ispass` | `~/.venvs/` | `/data/.venvs/` | Mamba-130m, Mamba2-130m | `mamba_ssm` |
+| `torch_falcon_ispass` | `~/.venvs/` | `/data/.venvs/` | Hymba-1.5B, Zamba2-1.2B | `mamba_ssm` + `transformers>=4.48` |
+
+> **Note:** `gen_fig9b.sh` auto-detects the platform via `/etc/nv_tegra_release`
+> and resolves the base directory accordingly (`~/.venvs/` on desktop,
+> `/data/.venvs/` on Jetson).  Override with `IS_JETSON=1` or `IS_JETSON=0`.
 
 ---
 
@@ -136,14 +173,18 @@ done
 ## Step 2 — Collect Jetson Data
 
 On the **Jetson board**, clone the repository (or transfer this directory),
-then run the same three collection steps as Step 1.  Use `SKIP_PLOT=1` so the
-script does not attempt to generate the comparison plot before the desktop data
-is available:
+then run the same collection steps as Step 1 using `gen_fig9b.sh`.  The script
+auto-detects the Jetson platform via `/etc/nv_tegra_release` and sources venvs
+from `/data/.venvs/` instead of `~/.venvs/`.  Pass `SKIP_PLOT=1` so it does
+not attempt to generate the comparison plot before the desktop data is merged:
 
 ```bash
-# On the Jetson board
+# On the Jetson board — venvs resolved automatically from /data/.venvs/
 cd <repo_root>
 SKIP_PLOT=1 bash ispass_ae/scripts/paper_figures/Fig_9b/gen_fig9b.sh
+
+# If auto-detection fails, force Jetson mode:
+# IS_JETSON=1 SKIP_PLOT=1 bash ispass_ae/scripts/paper_figures/Fig_9b/gen_fig9b.sh
 ```
 
 This writes CSVs to `src/profile_logs/` on the Jetson.
