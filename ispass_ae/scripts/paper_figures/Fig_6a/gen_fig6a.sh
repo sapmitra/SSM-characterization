@@ -28,10 +28,13 @@
 # Raw power logs: src/power_logs/
 # Structured CSV:  src/energy_logs/energy_data.csv
 
-set -euo pipefail
+set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../../../../" && pwd)"
+
+# Accumulates "model@seq_len=N (exit N)" strings for failed runs.
+FAILED_RUNS=()
 
 COLLECT_SCRIPT="${SCRIPT_DIR}/collect_fig6a_data.py"
 PLOT_SCRIPT="${SCRIPT_DIR}/plot_fig6a.py"
@@ -55,7 +58,17 @@ cd "${REPO_ROOT}/src"
 
 for SEQ_LEN in "${SEQ_LENS[@]}"; do
     echo "  [Qwen] seq_len=${SEQ_LEN} ..."
-    python "${COLLECT_SCRIPT}" --model qwen --seq_len "${SEQ_LEN}" --device cuda
+    python "${COLLECT_SCRIPT}" --model qwen --seq_len "${SEQ_LEN}" --device cuda \
+    || {
+        rc=$?
+        if [[ ${rc} -eq 2 ]]; then
+            echo "  [SKIP] qwen seq_len=${SEQ_LEN}: OOM — continuing."
+            FAILED_RUNS+=("qwen@seq_len=${SEQ_LEN} (OOM, exit ${rc})")
+        else
+            echo "  [SKIP] qwen seq_len=${SEQ_LEN}: unexpected error (exit ${rc}) — continuing."
+            FAILED_RUNS+=("qwen@seq_len=${SEQ_LEN} (error, exit ${rc})")
+        fi
+    }
 done
 
 deactivate
@@ -70,7 +83,17 @@ cd "${REPO_ROOT}/src"
 
 for SEQ_LEN in "${SEQ_LENS[@]}"; do
     echo "  [Mamba2] seq_len=${SEQ_LEN} ..."
-    python "${COLLECT_SCRIPT}" --model mamba2 --seq_len "${SEQ_LEN}" --device cuda
+    python "${COLLECT_SCRIPT}" --model mamba2 --seq_len "${SEQ_LEN}" --device cuda \
+    || {
+        rc=$?
+        if [[ ${rc} -eq 2 ]]; then
+            echo "  [SKIP] mamba2 seq_len=${SEQ_LEN}: OOM — continuing."
+            FAILED_RUNS+=("mamba2@seq_len=${SEQ_LEN} (OOM, exit ${rc})")
+        else
+            echo "  [SKIP] mamba2 seq_len=${SEQ_LEN}: unexpected error (exit ${rc}) — continuing."
+            FAILED_RUNS+=("mamba2@seq_len=${SEQ_LEN} (error, exit ${rc})")
+        fi
+    }
 done
 
 deactivate
@@ -85,7 +108,17 @@ cd "${REPO_ROOT}/src"
 
 for SEQ_LEN in "${SEQ_LENS[@]}"; do
     echo "  [Falcon-H1] seq_len=${SEQ_LEN} ..."
-    python "${COLLECT_SCRIPT}" --model falcon --seq_len "${SEQ_LEN}" --device cuda
+    python "${COLLECT_SCRIPT}" --model falcon --seq_len "${SEQ_LEN}" --device cuda \
+    || {
+        rc=$?
+        if [[ ${rc} -eq 2 ]]; then
+            echo "  [SKIP] falcon seq_len=${SEQ_LEN}: OOM — continuing."
+            FAILED_RUNS+=("falcon@seq_len=${SEQ_LEN} (OOM, exit ${rc})")
+        else
+            echo "  [SKIP] falcon seq_len=${SEQ_LEN}: unexpected error (exit ${rc}) — continuing."
+            FAILED_RUNS+=("falcon@seq_len=${SEQ_LEN} (error, exit ${rc})")
+        fi
+    }
 done
 
 # ---------------------------------------------------------------------------
@@ -112,3 +145,16 @@ echo "Energy CSV     : ${ENERGY_CSV}"
 echo ""
 echo "To re-inspect power logs without re-running inference:"
 echo "  cd ${REPO_ROOT}/src && python -m profiling.power_logger --log_dir power_logs --num_iterations 50"
+
+# ---------------------------------------------------------------------------
+# Report any skipped runs
+# ---------------------------------------------------------------------------
+if [[ ${#FAILED_RUNS[@]} -gt 0 ]]; then
+    echo ""
+    echo "================================================================"
+    echo "WARNING: ${#FAILED_RUNS[@]} run(s) were skipped due to errors:"
+    for entry in "${FAILED_RUNS[@]}"; do
+        echo "  - ${entry}"
+    done
+    echo "================================================================"
+fi

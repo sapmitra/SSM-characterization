@@ -28,10 +28,13 @@
 #   - Zamba2 runs in the same `torch_falcon_ispass` venv as Falcon-H1.
 #   - Sequence lengths are shorter than Fig_5a due to the 8 GB Jetson memory.
 
-set -euo pipefail
+set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../../../../" && pwd)"
+
+# Accumulates "model@seq_len=N (exit N)" strings for failed runs.
+FAILED_RUNS=()
 
 COLLECT_SCRIPT="${SCRIPT_DIR}/collect_fig5b_data.py"
 PLOT_SCRIPT="${SCRIPT_DIR}/plot_fig5b.py"
@@ -60,6 +63,11 @@ ZAMBA2_SEQ_LENS="256 512 1024 2048 4096 8192"
 
 # ---------------------------------------------------------------------------
 # Helper: profile one model across a list of sequence lengths
+#
+# Exit codes returned by collect_fig5b_data.py:
+#   0  — success
+#   2  — out-of-memory (OOM); logged and skipped, experiment continues
+#   *  — unexpected error; logged and skipped, experiment continues
 # ---------------------------------------------------------------------------
 profile_model() {
     local model_key="$1"
@@ -69,7 +77,17 @@ profile_model() {
         python "${COLLECT_SCRIPT}" \
             --model  "${model_key}" \
             --seq_len "${seq_len}" \
-            --device cuda
+            --device cuda \
+        || {
+            local rc=$?
+            if [[ ${rc} -eq 2 ]]; then
+                echo "  [SKIP] ${model_key} seq_len=${seq_len}: OOM — continuing."
+                FAILED_RUNS+=("${model_key}@seq_len=${seq_len} (OOM, exit ${rc})")
+            else
+                echo "  [SKIP] ${model_key} seq_len=${seq_len}: unexpected error (exit ${rc}) — continuing."
+                FAILED_RUNS+=("${model_key}@seq_len=${seq_len} (error, exit ${rc})")
+            fi
+        }
     done
 }
 
@@ -155,3 +173,16 @@ deactivate
 echo ""
 echo "Done.  Output:"
 echo "  ${OUT_DIR}/memory_footprint_jetson_ispass.png"
+
+# ---------------------------------------------------------------------------
+# Report any skipped runs
+# ---------------------------------------------------------------------------
+if [[ ${#FAILED_RUNS[@]} -gt 0 ]]; then
+    echo ""
+    echo "================================================================"
+    echo "WARNING: ${#FAILED_RUNS[@]} run(s) were skipped due to errors:"
+    for entry in "${FAILED_RUNS[@]}"; do
+        echo "  - ${entry}"
+    done
+    echo "================================================================"
+fi

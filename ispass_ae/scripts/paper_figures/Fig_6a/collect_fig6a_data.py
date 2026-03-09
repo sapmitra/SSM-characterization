@@ -100,9 +100,13 @@ def parse_args():
     return p.parse_args()
 
 
-def main():
-    args = parse_args()
+# Exit code reserved for out-of-memory errors so the caller can distinguish
+# OOM from other failures.
+_EXIT_OOM = 2
 
+
+def _run(args) -> None:
+    """Dispatch to the appropriate energy-profiling function."""
     if args.model == "qwen":
         from models.profile_runner import qwen25_instruct_energy
 
@@ -144,6 +148,28 @@ def main():
             device=args.device,
             weights=args.weights,
         )
+
+
+def main():
+    args = parse_args()
+    try:
+        _run(args)
+    except Exception as exc:  # noqa: BLE001
+        # Detect CUDA / CPU out-of-memory conditions regardless of the exact
+        # exception type (torch.cuda.OutOfMemoryError is a RuntimeError subclass
+        # but the message pattern is stable across PyTorch versions).
+        oom_keywords = ("out of memory", "outofmemory", "cuda error: out of memory")
+        is_oom = any(kw in str(exc).lower() for kw in oom_keywords)
+        if is_oom:
+            print(
+                f"\n[OOM] {args.model} seq_len={args.seq_len} exceeded GPU memory — "
+                "skipping this data point.",
+                file=sys.stderr,
+            )
+            sys.exit(_EXIT_OOM)
+        # Re-raise unexpected errors so the caller sees a non-zero exit code
+        # and the full traceback.
+        raise
 
 
 if __name__ == "__main__":

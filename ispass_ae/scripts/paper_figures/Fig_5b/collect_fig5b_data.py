@@ -165,6 +165,11 @@ def parse_args() -> argparse.Namespace:
     return p.parse_args()
 
 
+# Exit code reserved for out-of-memory errors so the caller can distinguish
+# OOM from other failures.
+_EXIT_OOM = 2
+
+
 def main() -> None:
     args = parse_args()
     model_name, model_config = MODEL_REGISTRY[args.model]
@@ -181,14 +186,31 @@ def main() -> None:
     print(f"  csv_output   : {JETSON_CSV}")
     print()
 
-    model_prefill(
-        model_name=model_name,
-        model_config=model_config,
-        seq_len=args.seq_len,
-        batch_size=args.batch_size,
-        device=args.device,
-        csv_filename=JETSON_CSV,
-    )
+    try:
+        model_prefill(
+            model_name=model_name,
+            model_config=model_config,
+            seq_len=args.seq_len,
+            batch_size=args.batch_size,
+            device=args.device,
+            csv_filename=JETSON_CSV,
+        )
+    except Exception as exc:  # noqa: BLE001
+        # Detect CUDA / CPU out-of-memory conditions regardless of the exact
+        # exception type (torch.cuda.OutOfMemoryError is a RuntimeError subclass
+        # but the message pattern is stable across PyTorch versions).
+        oom_keywords = ("out of memory", "outofmemory", "cuda error: out of memory")
+        is_oom = any(kw in str(exc).lower() for kw in oom_keywords)
+        if is_oom:
+            print(
+                f"\n[OOM] {args.model} seq_len={args.seq_len} exceeded GPU memory — "
+                "skipping this data point.",
+                file=sys.stderr,
+            )
+            sys.exit(_EXIT_OOM)
+        # Re-raise unexpected errors so the caller sees a non-zero exit code
+        # and the full traceback.
+        raise
 
     print()
     csv_out = os.path.join(_src, "memory", JETSON_CSV)
