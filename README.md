@@ -24,7 +24,7 @@
 
 ---
 
-## 🗺️ What Is This?
+## 🗺️ Overview
 
 **SSM-Scope** provides comprehensive benchmarking and profiling tools to evaluate three families of language models across long context lengths on both a desktop GPU (RTX 4090) and an edge device (NVIDIA Jetson Nano Orin):
 
