@@ -150,4 +150,3 @@ Two PNG files are produced in `out_dir`:
 | `energy_consumption.png` | Publication-quality figure (no axis labels, 300 DPI) |
 | `energy_consumption_annotated.png` | Annotated version with exact values on each bar (150 DPI) |
 
-> 💡 **Tip:** If the CSV is absent or incomplete, `plot_fig6a.py` falls back to the hard-coded paper values so the figure can always be regenerated without running inference.

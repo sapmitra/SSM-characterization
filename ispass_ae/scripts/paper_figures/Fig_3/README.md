@@ -113,7 +113,5 @@ Two PNG files are produced in `out_dir`:
 | `accuracy_ttft.png` | Publication-quality figure (no axis tick labels, 300 DPI) |
 | `accuracy_ttft_annotated.png` | Annotated version with labels and exact TTFT values |
 
-> 💡 **Tip:** If the timing CSV is not present, `plot_fig3.py` falls back to hard-coded paper values so the figure can always be regenerated without running inference.
-
 ---
 

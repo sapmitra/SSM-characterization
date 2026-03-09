@@ -155,9 +155,5 @@ Output files written to `out_dir`:
 | `fig8_zamba2_breakdown.png` | Zamba2 individual breakdown (300 DPI) |
 | `fig8_zamba2_breakdown_annotated.png` | Zamba2 with annotations (150 DPI) |
 
-> 💡 **Tip:** If the profiling CSVs are not present, `plot_fig8.py` falls back to
-> hard-coded paper values so the figure can always be regenerated without
-> running inference.  Pass `--skip_summarize` if the summary CSVs already exist.
-
 ---
 

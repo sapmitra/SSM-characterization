@@ -12,8 +12,8 @@ Reproduce Figure 1 from the paper.
 Reads ``tpot_logs/tpot_times.csv`` produced by ``collect_fig1_data.py`` and
 generates two PNG files: a publication-quality figure and an annotated version.
 
-If the CSV is not available the script falls back to the hard-coded paper
-values so the figure can always be regenerated without running inference.
+The CSV must be available; the script exits with an error if it is missing
+or incomplete.
 
 Usage (from repo root, any venv that has matplotlib + pandas):
 
@@ -34,7 +34,6 @@ Output files
 # ---------------------------------------------------------------------------
 import argparse
 import os
-import warnings
 
 # ---------------------------------------------------------------------------
 # Third-party (matplotlib must be non-interactive for headless environments)
@@ -43,18 +42,6 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
-
-# ---------------------------------------------------------------------------
-# Paper / fallback values
-# (median of 10 runs, 5 warm-up iterations, NVIDIA A100 40 GB, CUDA 12.4)
-# ---------------------------------------------------------------------------
-PAPER_VALUES = {
-    # (model_key, input_seq_len): (ttft_s, tpot_s)
-    ("qwen",   1024):  (0.013823878000039258,  0.012523412535152545),
-    ("qwen",  32768):  (1.3003163600005792,    0.04180457996875475),
-    ("mamba2", 1024):  (0.0260057350005809,    0.013800665003898871),
-    ("mamba2", 32768): (0.49099710100017546,   0.013697560640622441),
-}
 
 # Inference scenarios shown in the figure: (input_tokens, output_tokens)
 SCENARIOS = [(1024, 256), (32768, 256)]
@@ -113,7 +100,7 @@ def _load_tpot_csv(csv_path: str) -> dict:
             }
         return result
     except Exception as exc:
-        warnings.warn(f"Could not load TPOT CSV ({csv_path}): {exc}")
+        print(f"WARNING: Could not parse TPOT CSV ({csv_path}): {exc}")
         return {}
 
 
@@ -125,25 +112,44 @@ def assemble_data(tpot_csv: str | None) -> tuple[dict, dict]:
     """
     Return (ttft, tpot) dicts mapping model_key → list of values per scenario.
 
-    Falls back to PAPER_VALUES for any missing (model_key, seq_len) entry.
+    Exits with an error if the CSV is missing, unreadable, or lacks required entries.
     """
-    csv_data = (
-        _load_tpot_csv(tpot_csv)
-        if tpot_csv and os.path.isfile(tpot_csv)
-        else {}
-    )
+    if not tpot_csv or not os.path.isfile(tpot_csv):
+        print(
+            f"ERROR: TPOT CSV not found: {tpot_csv!r}\n"
+            "       Run collect_fig1_data.py first to generate the data file,\n"
+            "       then re-run this script with --tpot_csv <path>."
+        )
+        raise SystemExit(1)
+
+    csv_data = _load_tpot_csv(tpot_csv)
     if not csv_data:
-        warnings.warn("CSV not found or empty — using hard-coded paper values.")
+        print(
+            f"ERROR: CSV file {tpot_csv!r} could not be parsed or contains no\n"
+            "       recognised (model, seq_len) entries."
+        )
+        raise SystemExit(1)
 
     ttft: dict[str, list[float]] = {k: [] for k in MODEL_KEYS}
     tpot: dict[str, list[float]] = {k: [] for k in MODEL_KEYS}
+    missing: list[str] = []
 
     for key in MODEL_KEYS:
         for seq_len, _ in SCENARIOS:
-            paper_ttft, paper_tpot = PAPER_VALUES[(key, seq_len)]
-            entry = csv_data.get((key, seq_len), {})
-            ttft[key].append(entry.get("ttft", paper_ttft))
-            tpot[key].append(entry.get("tpot", paper_tpot))
+            entry = csv_data.get((key, seq_len))
+            if entry is None:
+                missing.append(f"  ({key}, seq_len={seq_len})")
+            else:
+                ttft[key].append(entry["ttft"])
+                tpot[key].append(entry["tpot"])
+
+    if missing:
+        print(
+            "ERROR: The following required entries are missing from the CSV:\n"
+            + "\n".join(missing) + "\n"
+            "       Re-run collect_fig1_data.py to collect the missing measurements."
+        )
+        raise SystemExit(1)
 
     return ttft, tpot
 

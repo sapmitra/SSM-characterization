@@ -14,8 +14,8 @@ Reads ``ttft_logs/iteration_times.csv`` produced by ``collect_fig3_data.py`` and
 ``accuracy_data.csv`` (bundled in this directory) then writes two PNG files:
 a clean publication figure and an annotated version.
 
-If the TTFT CSV is not available the script falls back to the hard-coded paper
-values so the figure can always be regenerated without running inference.
+Both data files must be available; the script exits with an error message
+if either is missing or cannot be parsed.
 
 Usage (from repo root, any venv that has matplotlib + pandas):
 
@@ -32,36 +32,12 @@ accuracy_ttft_annotated.png  — same data with labels and TTFT values annotated
 
 import argparse
 import os
-import warnings
+import sys
 
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
-
-# ---------------------------------------------------------------------------
-# Paper / fallback TTFT values  (seconds @ ~57k tokens)
-# ---------------------------------------------------------------------------
-PAPER_TTFT = {
-    "qwen25_1.5b":    8.24,
-    "mamba2_1.3b":    1.35,
-    "falcon_h1_1.5b": 2.95,
-}
-
-PAPER_ACCURACY = {
-    "qwen25_1.5b": {
-        "MMLU": 61.13, "HellaSwag": 67.86, "Winogrande": 64.56,
-        "ARC-C": 54.27,  "TruthfulQA": 47.05,
-    },
-    "mamba2_1.3b": {
-        "MMLU": 36.3,  "HellaSwag": 59.48, "Winogrande": 58.72,
-        "ARC-C": 33.2,  "TruthfulQA": 36.1,
-    },
-    "falcon_h1_1.5b": {
-        "MMLU": 61.81, "HellaSwag": 66.76, "Winogrande": 65.59,
-        "ARC-C": 53.24, "TruthfulQA": 49.39,
-    },
-}
 
 MODEL_KEYS   = ["qwen25_1.5b", "mamba2_1.3b", "falcon_h1_1.5b"]
 MODEL_LABELS = ["Qwen2.5-1.5B", "Mamba2-1.3B", "Falcon-H1-1.5B"]
@@ -108,12 +84,12 @@ def _load_ttft_csv(csv_path: str) -> dict:
             result.setdefault(key, []).append(ttft)
         return {k: sum(v) / len(v) for k, v in result.items()}
     except Exception as exc:
-        warnings.warn(f"Could not load TTFT CSV ({csv_path}): {exc}")
+        print(f"WARNING: Could not parse TTFT CSV ({csv_path}): {exc}")
         return {}
 
 
 def _load_accuracy_csv(csv_path: str) -> dict:
-    """Return nested dict model_key -> {task -> accuracy}. Falls back to PAPER_ACCURACY on error."""
+    """Return nested dict model_key -> {task -> accuracy}, or {} on error."""
     try:
         import pandas as pd
         df = pd.read_csv(csv_path)
@@ -125,30 +101,59 @@ def _load_accuracy_csv(csv_path: str) -> dict:
             if key is None or task not in TASKS:
                 continue
             result.setdefault(key, {})[task] = acc
-        return result if result else PAPER_ACCURACY
+        return result
     except Exception as exc:
-        warnings.warn(f"Could not load accuracy CSV ({csv_path}): {exc}")
-        return PAPER_ACCURACY
+        print(f"WARNING: Could not parse accuracy CSV ({csv_path}): {exc}")
+        return {}
 
 
 def assemble_data(ttft_csv, accuracy_csv):
-    """Return (ttft_dict, accuracy_dict), falling back to paper values when CSVs are absent."""
-    ttft = dict(PAPER_TTFT)
-    if ttft_csv and os.path.isfile(ttft_csv):
-        loaded = _load_ttft_csv(ttft_csv)
-        if loaded:
-            ttft.update(loaded)
-            print(f"Loaded TTFT from {ttft_csv}: {loaded}")
-        else:
-            warnings.warn("TTFT CSV present but no matching rows found — using paper TTFT values.")
-    else:
-        warnings.warn("TTFT CSV not found — using hard-coded paper TTFT values.")
+    """
+    Return (ttft_dict, accuracy_dict).  Exits with an error if any required
+    data file is missing or cannot be parsed.
+    """
+    # --- TTFT ---
+    if not ttft_csv or not os.path.isfile(ttft_csv):
+        print(
+            f"ERROR: TTFT CSV not found: {ttft_csv!r}\n"
+            "       Run collect_fig3_data.py first, then re-run with --ttft_csv <path>."
+        )
+        sys.exit(1)
 
-    accuracy = PAPER_ACCURACY
-    if accuracy_csv and os.path.isfile(accuracy_csv):
-        loaded_acc = _load_accuracy_csv(accuracy_csv)
-        if loaded_acc:
-            accuracy = loaded_acc
+    ttft = _load_ttft_csv(ttft_csv)
+    if not ttft:
+        print(
+            f"ERROR: TTFT CSV {ttft_csv!r} could not be parsed or contains no\n"
+            "       recognised (model, seq_len) entries."
+        )
+        sys.exit(1)
+
+    missing_ttft = [kl for ki, kl in zip(MODEL_KEYS, MODEL_LABELS) if ki not in ttft]
+    if missing_ttft:
+        print(
+            "ERROR: TTFT data missing for the following models:\n"
+            + "".join(f"  {m}\n" for m in missing_ttft)
+            + "       Re-run collect_fig3_data.py to collect the missing measurements."
+        )
+        sys.exit(1)
+
+    print(f"Loaded TTFT from {ttft_csv}: {ttft}")
+
+    # --- Accuracy ---
+    if not accuracy_csv or not os.path.isfile(accuracy_csv):
+        print(
+            f"ERROR: Accuracy CSV not found: {accuracy_csv!r}\n"
+            "       Ensure accuracy_data.csv is present next to this script."
+        )
+        sys.exit(1)
+
+    accuracy = _load_accuracy_csv(accuracy_csv)
+    if not accuracy:
+        print(
+            f"ERROR: Accuracy CSV {accuracy_csv!r} could not be parsed or contains\n"
+            "       no recognised entries."
+        )
+        sys.exit(1)
 
     return ttft, accuracy
 

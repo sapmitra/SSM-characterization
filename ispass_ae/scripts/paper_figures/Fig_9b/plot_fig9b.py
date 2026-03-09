@@ -46,7 +46,6 @@ Output files
 # ---------------------------------------------------------------------------
 import argparse
 import os
-import warnings
 from typing import Optional
 
 # ---------------------------------------------------------------------------
@@ -229,7 +228,7 @@ def summarize_non_gemm(prof_dir: str):
     (and companion files) in-place.  Idempotent — safe to call repeatedly.
     """
     if not os.path.isdir(prof_dir):
-        warnings.warn(f"Profile directory not found: {prof_dir}")
+        print(f"WARNING: Profile directory not found: {prof_dir}")
         return
 
     for dir_name in sorted(os.listdir(prof_dir)):
@@ -297,11 +296,11 @@ def extract_comparison_data(model_categories, seq_len, desktop_dir, jetson_dir):
         desktop_df = load_pct_csv(desktop_dir, model, seq_len)
         jetson_df  = load_pct_csv(jetson_dir,  model, seq_len)
         if desktop_df is None:
-            warnings.warn(f"Desktop data not found for '{model}' at seq_len={seq_len} "
-                          f"in '{desktop_dir}'")
+            print(f"WARNING: Desktop data not found for '{model}' at seq_len={seq_len} "
+                  f"in '{desktop_dir}'")
         if jetson_df is None:
-            warnings.warn(f"Jetson data not found for '{model}' at seq_len={seq_len} "
-                          f"in '{jetson_dir}'")
+            print(f"WARNING: Jetson data not found for '{model}' at seq_len={seq_len} "
+                  f"in '{jetson_dir}'")
         data[model] = {'desktop': desktop_df, 'jetson': jetson_df}
     return data
 

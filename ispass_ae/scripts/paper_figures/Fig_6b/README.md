@@ -117,6 +117,4 @@ Two PNG files are produced in `out_dir`:
 | `overall_throughput_comparison.png` | Publication-quality figure (no axis labels, 300 DPI) |
 | `overall_throughput_annotated.png`  | Annotated version with exact values on each bar (150 DPI) |
 
-> 💡 **Tip:** If the CSV is not present, `plot_fig6b.py` falls back to hard-coded paper values so the figure can always be regenerated without running inference.
-
 ---

@@ -14,8 +14,8 @@ Reads per-operator CSV files produced by ``collect_fig8_data.py``, aggregates
 kernel times into operator categories, and generates a side-by-side stacked
 bar chart.
 
-If the CSV files are absent the script falls back to hard-coded paper values
-so the figure can always be regenerated without running inference.
+If the CSV files are absent the script exits with an error message
+indicating which data needs to be collected.
 
 Usage (from repo root, any venv that has matplotlib + pandas):
 
@@ -40,7 +40,7 @@ Output files
 # ---------------------------------------------------------------------------
 import argparse
 import os
-import warnings
+import sys
 
 # ---------------------------------------------------------------------------
 # Third-party
@@ -189,7 +189,7 @@ def summarize_non_gemm(prof_dir: str, target_models=None):
         target_models = list(MODEL_SEQ_LENGTHS.keys())
 
     if not os.path.isdir(prof_dir):
-        warnings.warn(f"Profile directory not found: {prof_dir}")
+        print(f"WARNING: Profile directory not found: {prof_dir}")
         return
 
     for dir_name in sorted(os.listdir(prof_dir)):
@@ -259,56 +259,15 @@ def load_breakdown(prof_dir: str, model: str, device='cuda', batch_size=1):
     return breakdown
 
 
-# ===========================================================================
-# Hard-coded paper fallback values
-# (median of 10 active profiling runs, NVIDIA A100 40 GB, CUDA 12.4)
-# ===========================================================================
-
-PAPER_VALUES = {
-    "hymba": pd.DataFrame({
-        256:   {"GEMM": 58.1, "SSM_Scan": 9.3,  "activation": 3.1, "arithmetic": 5.2,
-                "memory": 10.4, "nomralization": 3.6, "embedding": 1.2, "logit_computation": 0.4,
-                "other": 8.7},
-        1024:  {"GEMM": 52.3, "SSM_Scan": 14.7, "activation": 2.8, "arithmetic": 5.6,
-                "memory": 9.7, "nomralization": 3.1, "embedding": 0.7, "logit_computation": 0.9,
-                "other": 10.2},
-        4096:  {"GEMM": 42.1, "SSM_Scan": 24.8, "activation": 2.4, "arithmetic": 6.1,
-                "memory": 9.1, "nomralization": 2.6, "embedding": 0.4, "logit_computation": 1.5,
-                "other": 11.0},
-        16384: {"GEMM": 30.4, "SSM_Scan": 38.2, "activation": 1.9, "arithmetic": 6.8,
-                "memory": 8.6, "nomralization": 2.1, "embedding": 0.2, "logit_computation": 2.3,
-                "other": 9.5},
-    }).T,
-    "zamba2": pd.DataFrame({
-        256:   {"GEMM": 60.4, "SSM_Scan": 7.1,  "activation": 2.9, "arithmetic": 5.8,
-                "memory": 9.6, "nomralization": 4.2, "embedding": 1.1, "logit_computation": 0.3,
-                "other": 8.6},
-        1024:  {"GEMM": 54.7, "SSM_Scan": 12.3, "activation": 2.6, "arithmetic": 6.2,
-                "memory": 9.1, "nomralization": 3.7, "embedding": 0.6, "logit_computation": 0.8,
-                "other": 10.0},
-        4096:  {"GEMM": 44.2, "SSM_Scan": 21.5, "activation": 2.2, "arithmetic": 6.9,
-                "memory": 8.7, "nomralization": 3.1, "embedding": 0.3, "logit_computation": 1.4,
-                "other": 11.7},
-        16384: {"GEMM": 33.1, "SSM_Scan": 33.8, "activation": 1.8, "arithmetic": 7.6,
-                "memory": 8.4, "nomralization": 2.6, "embedding": 0.2, "logit_computation": 2.2,
-                "other": 10.3},
-        32768: {"GEMM": 24.6, "SSM_Scan": 43.9, "activation": 1.5, "arithmetic": 8.1,
-                "memory": 8.1, "nomralization": 2.2, "embedding": 0.1, "logit_computation": 2.9,
-                "other": 8.6},
-    }).T,
-}
-
-
 def get_breakdown(prof_dir: str, model: str):
-    """Return breakdown DataFrame, falling back to paper values if CSVs are missing."""
+    """Return breakdown DataFrame, or exit with an error if CSVs are missing."""
     df = load_breakdown(prof_dir, model)
     if df is None or df.empty:
-        warnings.warn(
-            f"No profiling CSVs found for '{model}' in '{prof_dir}' — "
-            f"using hard-coded paper fallback values."
+        print(
+            f"ERROR: No profiling CSVs found for '{model}' in '{prof_dir}'.\n"
+            f"       Run collect_fig8_data.py first (see gen_fig8.sh)."
         )
-        paper = PAPER_VALUES[model]
-        return paper.T
+        raise SystemExit(1)
     return df
 
 

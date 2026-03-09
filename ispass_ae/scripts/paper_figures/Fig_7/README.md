@@ -140,8 +140,4 @@ Output files written to `out_dir`:
 | `fig7_mamba2_breakdown.png` | Mamba2-130m individual breakdown (300 DPI) |
 | `fig7_mamba2_breakdown_annotated.png` | Mamba2-130m with annotations (150 DPI) |
 
-> 💡 **Tip:** If the profiling CSVs are not present, `plot_fig7.py` falls back to
-> hard-coded paper values so the figure can always be regenerated without
-> running inference.  Pass `--skip_summarize` if the summary CSVs already exist.
-
 ---

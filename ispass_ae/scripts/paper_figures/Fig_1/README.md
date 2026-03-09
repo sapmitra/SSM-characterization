@@ -103,7 +103,5 @@ Two PNG files are produced in `out_dir`:
 | `intro_ttft_tpot.png` | Publication-quality figure (no axis labels, 300 DPI) |
 | `intro_ttft_tpot_annotated.png` | Annotated version with exact values on each bar |
 
-> 💡 **Tip:** If the CSVs are not present, `plot_fig1.py` falls back to the hardcoded paper values so the figure can always be regenerated without running inference.
-
 ---
 

@@ -13,8 +13,8 @@ Reads ``throughput_logs/generation_times.csv`` produced by
 ``collect_fig6b_data.py`` and generates two PNG files: a publication-quality
 figure and an annotated version.
 
-If the CSV is not available the script falls back to hard-coded paper values so
-the figure can always be regenerated without running inference.
+The CSV must be available; the script exits with an error if it is missing
+or incomplete.
 
 Usage (from repo root, any venv that has matplotlib + pandas):
 
@@ -35,7 +35,7 @@ Output files
 # ---------------------------------------------------------------------------
 import argparse
 import os
-import warnings
+import sys
 
 # ---------------------------------------------------------------------------
 # Third-party
@@ -51,31 +51,6 @@ import numpy as np
 # overall_throughput = (input_seq_length + output_tokens) / total_time_seconds
 # ---------------------------------------------------------------------------
 SEQ_LENGTHS = [1024, 2048, 4096, 8192, 16384, 24576, 32768]
-
-PAPER_VALUES = {
-    # (model_key, input_seq_len): overall_throughput  (tokens/s)
-    ("qwen",   1024):  381.7,
-    ("qwen",   2048):  717.7,
-    ("qwen",   4096):  1353.3,
-    ("qwen",   8192):  2586.7,
-    ("qwen",  16384):  4869.5,
-    ("qwen",  24576):  6975.3,
-    ("qwen",  32768):  2769.0,
-    ("mamba2", 1024):  352.7,
-    ("mamba2", 2048):  643.3,
-    ("mamba2", 4096):  1211.7,
-    ("mamba2", 8192):  2174.5,
-    ("mamba2",16384):  4092.2,
-    ("mamba2",24576):  6110.9,
-    ("mamba2",32768):  7326.4,
-    ("falcon", 1024):  175.3,
-    ("falcon", 2048):  322.2,
-    ("falcon", 4096):  628.7,
-    ("falcon", 8192):  1189.4,
-    ("falcon",16384):  2296.3,
-    ("falcon",24576):  3317.0,
-    ("falcon",32768):  4260.8,
-}
 
 MODEL_KEYS   = ["qwen",            "mamba2",      "falcon"]
 MODEL_LABELS = ["Qwen2.5-0.5B",   "Mamba2-780m", "Falcon-H1 0.5B"]
@@ -124,7 +99,7 @@ def _load_throughput_csv(csv_path: str) -> dict:
             result[(key, sl)] = overall_tp
         return result
     except Exception as exc:
-        warnings.warn(f"Could not load throughput CSV ({csv_path}): {exc}")
+        print(f"WARNING: Could not parse throughput CSV ({csv_path}): {exc}")
         return {}
 
 
@@ -137,21 +112,41 @@ def assemble_data(throughput_csv: str | None) -> dict:
     Return a dict mapping model_key → list of overall throughput values per
     seq_len (one per entry in SEQ_LENGTHS).
 
-    Falls back to PAPER_VALUES for any missing entry.
+    Exits with an error if the CSV is missing, unreadable, or lacks required entries.
     """
-    csv_data = (
-        _load_throughput_csv(throughput_csv)
-        if throughput_csv and os.path.isfile(throughput_csv)
-        else {}
-    )
+    if not throughput_csv or not os.path.isfile(throughput_csv):
+        print(
+            f"ERROR: Throughput CSV not found: {throughput_csv!r}\n"
+            "       Run collect_fig6b_data.py first, then re-run with --throughput_csv <path>."
+        )
+        raise SystemExit(1)
+
+    csv_data = _load_throughput_csv(throughput_csv)
     if not csv_data:
-        warnings.warn("CSV not found or empty — using hard-coded paper values.")
+        print(
+            f"ERROR: CSV file {throughput_csv!r} could not be parsed or contains no\n"
+            "       recognised (model, seq_len) entries."
+        )
+        raise SystemExit(1)
+
+    missing = [
+        f"  ({key}, seq_len={sl})"
+        for key in MODEL_KEYS
+        for sl in SEQ_LENGTHS
+        if (key, sl) not in csv_data
+    ]
+    if missing:
+        print(
+            "ERROR: The following required entries are missing from the CSV:\n"
+            + "\n".join(missing) + "\n"
+            "       Re-run collect_fig6b_data.py to collect the missing measurements."
+        )
+        raise SystemExit(1)
 
     data: dict[str, list[float]] = {k: [] for k in MODEL_KEYS}
     for key in MODEL_KEYS:
         for sl in SEQ_LENGTHS:
-            fallback = PAPER_VALUES.get((key, sl), 0.0)
-            data[key].append(csv_data.get((key, sl), fallback))
+            data[key].append(csv_data[(key, sl)])
     return data
 
 

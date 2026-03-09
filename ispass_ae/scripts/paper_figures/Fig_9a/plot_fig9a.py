@@ -14,8 +14,8 @@ Reads per-operator CSV files produced by ``collect_fig9a_data.py``, aggregates
 kernel times into operator categories, and generates a side-by-side stacked
 bar chart.
 
-If the CSV files are absent the script falls back to the hard-coded paper
-values so the figure can always be regenerated without running inference.
+If the CSV files are absent the script exits with an error message
+indicating which data needs to be collected.
 
 Usage (from repo root, any venv that has matplotlib + pandas):
 
@@ -36,7 +36,7 @@ Output files
 # ---------------------------------------------------------------------------
 import argparse
 import os
-import warnings
+import sys
 
 # ---------------------------------------------------------------------------
 # Third-party
@@ -182,7 +182,7 @@ def summarize_non_gemm(prof_dir: str):
     ``plotting_ops_jetson.ipynb``.
     """
     if not os.path.isdir(prof_dir):
-        warnings.warn(f"Profile directory not found: {prof_dir}")
+        print(f"WARNING: Profile directory not found: {prof_dir}")
         return
 
     for dir_name in sorted(os.listdir(prof_dir)):
@@ -247,79 +247,15 @@ def load_breakdown(prof_dir: str, model: str, device='cuda', batch_size=1):
     return pd.DataFrame(model_data)
 
 
-# ===========================================================================
-# Hard-coded paper fallback values
-# (median of 10 active profiling runs, NVIDIA Jetson Nano, JetPack 6.x)
-# Columns = seq_len, Rows = operator category
-# ===========================================================================
-
-PAPER_VALUES = {
-    "mamba-130m": pd.DataFrame({
-        256:   {"GEMM": 60.1, "SSM_Scan": 21.5, "activation": 3.3, "arithmetic": 4.0,
-                "memory": 6.2, "nomralization": 1.9, "embedding": 1.2, "logit_computation": 0.4,
-                "other": 1.4},
-        512:   {"GEMM": 56.4, "SSM_Scan": 26.3, "activation": 3.1, "arithmetic": 4.2,
-                "memory": 5.7, "nomralization": 1.7, "embedding": 0.9, "logit_computation": 0.6,
-                "other": 1.1},
-        1024:  {"GEMM": 51.2, "SSM_Scan": 32.8, "activation": 2.8, "arithmetic": 4.5,
-                "memory": 5.0, "nomralization": 1.5, "embedding": 0.7, "logit_computation": 0.9,
-                "other": 0.6},
-        2048:  {"GEMM": 43.7, "SSM_Scan": 41.1, "activation": 2.5, "arithmetic": 4.9,
-                "memory": 4.3, "nomralization": 1.3, "embedding": 0.5, "logit_computation": 1.3,
-                "other": 0.4},
-        4096:  {"GEMM": 34.8, "SSM_Scan": 50.4, "activation": 2.1, "arithmetic": 5.3,
-                "memory": 3.9, "nomralization": 1.1, "embedding": 0.4, "logit_computation": 1.7,
-                "other": 0.3},
-        8192:  {"GEMM": 25.9, "SSM_Scan": 59.6, "activation": 1.8, "arithmetic": 5.7,
-                "memory": 3.5, "nomralization": 0.9, "embedding": 0.2, "logit_computation": 2.1,
-                "other": 0.3},
-        16384: {"GEMM": 18.3, "SSM_Scan": 67.4, "activation": 1.5, "arithmetic": 6.1,
-                "memory": 3.3, "nomralization": 0.8, "embedding": 0.1, "logit_computation": 2.2,
-                "other": 0.3},
-        32768: {"GEMM": 12.7, "SSM_Scan": 73.5, "activation": 1.3, "arithmetic": 6.4,
-                "memory": 3.1, "nomralization": 0.7, "embedding": 0.1, "logit_computation": 1.9,
-                "other": 0.3},
-    }).T,
-    "mamba2-130m": pd.DataFrame({
-        256:   {"GEMM": 57.3, "SSM_Scan": 17.9, "activation": 3.6, "arithmetic": 6.5,
-                "memory": 8.1, "nomralization": 2.2, "embedding": 1.3, "logit_computation": 0.4,
-                "other": 2.7},
-        512:   {"GEMM": 53.1, "SSM_Scan": 22.8, "activation": 3.3, "arithmetic": 6.9,
-                "memory": 7.4, "nomralization": 1.9, "embedding": 1.0, "logit_computation": 0.6,
-                "other": 3.0},
-        1024:  {"GEMM": 47.6, "SSM_Scan": 28.5, "activation": 3.0, "arithmetic": 7.2,
-                "memory": 6.7, "nomralization": 1.7, "embedding": 0.8, "logit_computation": 0.9,
-                "other": 3.6},
-        2048:  {"GEMM": 40.2, "SSM_Scan": 36.9, "activation": 2.7, "arithmetic": 7.6,
-                "memory": 6.0, "nomralization": 1.5, "embedding": 0.6, "logit_computation": 1.3,
-                "other": 3.2},
-        4096:  {"GEMM": 31.5, "SSM_Scan": 46.7, "activation": 2.4, "arithmetic": 8.0,
-                "memory": 5.4, "nomralization": 1.2, "embedding": 0.4, "logit_computation": 1.7,
-                "other": 2.7},
-        8192:  {"GEMM": 22.8, "SSM_Scan": 56.2, "activation": 2.0, "arithmetic": 8.5,
-                "memory": 5.0, "nomralization": 1.0, "embedding": 0.2, "logit_computation": 2.1,
-                "other": 2.2},
-        16384: {"GEMM": 15.7, "SSM_Scan": 64.8, "activation": 1.7, "arithmetic": 8.9,
-                "memory": 4.7, "nomralization": 0.9, "embedding": 0.1, "logit_computation": 2.4,
-                "other": 0.8},
-        32768: {"GEMM": 10.8, "SSM_Scan": 71.3, "activation": 1.5, "arithmetic": 9.2,
-                "memory": 4.4, "nomralization": 0.8, "embedding": 0.1, "logit_computation": 1.6,
-                "other": 0.3},
-    }).T,
-}
-
-
 def get_breakdown(prof_dir: str, model: str):
-    """Return breakdown DataFrame, falling back to paper values if CSVs are missing."""
+    """Return breakdown DataFrame, or exit with an error if CSVs are missing."""
     df = load_breakdown(prof_dir, model)
     if df is None or df.empty:
-        warnings.warn(
-            f"No profiling CSVs found for '{model}' in '{prof_dir}' — "
-            f"using hard-coded paper fallback values."
+        print(
+            f"ERROR: No profiling CSVs found for '{model}' in '{prof_dir}'.\n"
+            f"       Run collect_fig9a_data.py first (see gen_fig9a.sh)."
         )
-        paper = PAPER_VALUES[model]
-        avail = [sl for sl in SEQ_LENGTHS if sl in paper.index]
-        return paper.loc[avail].T
+        raise SystemExit(1)
     return df
 
 

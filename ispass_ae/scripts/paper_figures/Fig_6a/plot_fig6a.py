@@ -13,9 +13,8 @@ Reads ``energy_logs/energy_data.csv`` produced by ``collect_fig6a_data.py``
 and generates two PNG files: a publication-quality figure and an annotated
 version with exact values on each bar.
 
-If the CSV is not available (or is incomplete), the script falls back to
-the hard-coded paper values so the figure can always be regenerated without
-running inference.
+The CSV must be available; the script exits with an error if it is missing
+or incomplete.
 
 Usage (from repo root, any venv with matplotlib + pandas):
 
@@ -33,56 +32,12 @@ Output files
 
 import argparse
 import os
-import warnings
+import sys
 
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
-
-# ---------------------------------------------------------------------------
-# Paper / fallback values
-# (measured on NVIDIA A100 40 GB, CUDA 12.4)
-# Row format: seq_len → energy_joules
-# ---------------------------------------------------------------------------
-PAPER_VALUES = {
-    "qwen": {
-        1024:  7.058,
-        2048:  12.85,
-        4096:  24.54,
-        8192:  42.22,
-        16384: 98.26,
-        24576: 166.97,
-        32768: 512.40,
-        40960: 802.99,
-        49152: 1187.36,
-        57344: 1492.62,
-    },
-    "mamba2": {
-        1024:  9.881,
-        2048:  14.66,
-        4096:  26.45,
-        8192:  53.45,
-        16384: 106.02,
-        24576: 158.58,
-        32768: 209.18,
-        40960: 261.25,
-        49152: 315.32,
-        57344: 370.53,
-    },
-    "falcon": {
-        1024:  10.609,
-        2048:  13.38,
-        4096:  24.37,
-        8192:  50.83,
-        16384: 116.36,
-        24576: 191.40,
-        32768: 283.51,
-        40960: 385.49,
-        49152: 496.90,
-        57344: 613.234,
-    },
-}
 
 SEQ_LENS = [1024, 2048, 4096, 8192, 16384, 24576, 32768, 40960, 49152, 57344]
 
@@ -129,32 +84,8 @@ def _load_energy_csv(csv_path: str) -> dict:
             result[key][sl] = ej
         return result
     except Exception as exc:
-        warnings.warn(f"Could not load energy CSV ({csv_path}): {exc}")
+        print(f"WARNING: Could not parse energy CSV ({csv_path}): {exc}")
         return {"qwen": {}, "mamba2": {}, "falcon": {}}
-
-
-def _merge_with_fallback(csv_data: dict) -> dict:
-    """
-    For each model/seq_len, use the CSV value when available; else fall back
-    to the hard-coded paper value.
-    """
-    merged = {}
-    for mk in MODEL_KEYS:
-        merged[mk] = {}
-        for sl in SEQ_LENS:
-            if sl in csv_data.get(mk, {}) and not _isnan(csv_data[mk][sl]):
-                merged[mk][sl] = csv_data[mk][sl]
-            else:
-                merged[mk][sl] = PAPER_VALUES[mk][sl]
-    return merged
-
-
-def _isnan(v):
-    try:
-        import math
-        return math.isnan(v)
-    except Exception:
-        return False
 
 
 # ---------------------------------------------------------------------------
@@ -249,16 +180,33 @@ def main():
     out_dir = args.out_dir or script_dir
     os.makedirs(out_dir, exist_ok=True)
 
-    # Load and merge
-    csv_data = _load_energy_csv(energy_csv)
-    data     = _merge_with_fallback(csv_data)
+    # Load and validate
+    if not os.path.isfile(energy_csv):
+        print(
+            f"ERROR: Energy CSV not found: {energy_csv!r}\n"
+            "       Run collect_fig6a_data.py first, then re-run with --energy_csv <path>."
+        )
+        sys.exit(1)
 
-    n_from_csv = sum(
-        1 for mk in MODEL_KEYS for sl in SEQ_LENS
-        if sl in csv_data.get(mk, {}) and not _isnan(csv_data.get(mk, {}).get(sl, float("nan")))
-    )
-    total = len(MODEL_KEYS) * len(SEQ_LENS)
-    print(f"Using {n_from_csv}/{total} data points from CSV; remainder from paper values.")
+    csv_data = _load_energy_csv(energy_csv)
+
+    missing = [
+        f"  ({mk}, seq_len={sl})"
+        for mk in MODEL_KEYS
+        for sl in SEQ_LENS
+        if sl not in csv_data.get(mk, {})
+    ]
+    if missing:
+        print(
+            "ERROR: The following required entries are missing from the CSV:\n"
+            + "\n".join(missing) + "\n"
+            "       Re-run collect_fig6a_data.py to collect the missing measurements."
+        )
+        sys.exit(1)
+
+    # Build data dict from CSV values only
+    data: dict = {mk: {sl: csv_data[mk][sl] for sl in SEQ_LENS} for mk in MODEL_KEYS}
+    print(f"Loaded {len(MODEL_KEYS) * len(SEQ_LENS)} data points from {energy_csv}.")
 
     # Publication-quality (no labels)
     _make_bar_plot(
