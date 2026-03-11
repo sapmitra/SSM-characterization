@@ -1738,125 +1738,14 @@ def profile_generate_shape (model_name,
     _analyze_prof_shape (prof, filename, custom)
 
 
-########## Not Stable and Not Used ############
-# @torch.no_grad()
-# def profile_hf_lm_model(model_name, model_config, path_weight, quantized, device, out_dir, export): 
-    
-#     skip_first, wait, warmup, active = 1, 2, 2, 2
-#     schedule = torch.profiler.schedule(skip_first =skip_first, wait = wait, warmup = warmup, active = active)
-#     device = device if torch.cuda.is_available() else 'cpu'
-#     mem_prof = False
-#     dynamo = False 
-#     dataset = "hello"
-    
-#     if (quantized):
-#         pass
-#     else:
-#         model_config = model_config if path_weight == None else path_weight
-#         model = transformers.AutoModelForCausalLM.from_pretrained(model_config).eval().to(device).to(torch.float16)
-#         tokenizer = transformers.AutoTokenizer.from_pretrained("TheBloke/Llama-2-7B-AWQ")
-#         model = transformers.AutoModelForCausalLM.from_pretrained("TheBloke/Llama-2-7B-AWQ").eval().to("cuda:0")
-#         if (dynamo): 
-#             model = torch.compile(model, backend="inductor")
-#         custom = True
-#         if (custom):
-#             #model = model.apply(replace_forward)
-            
-#             model = model.apply(lambda module: replace_forward(module, ops))
-#             custom = False
-#         #tokenizer = transformers.AutoTokenizer.from_pretrained(model_config)
-#         input_ = tokenizer (dataset, return_tensors ="pt").to(device)
-        
-#         with torch.profiler.profile(schedule = schedule, profile_memory=mem_prof) as prof:
-#             for _ in range (skip_first + wait + warmup + active):
-#                 with torch.profiler.record_function(f"Inference_prof"):
-#                     st = time.perf_counter()
-#                     #out = model.generate(**input_, max_length = 8)
-#                     out = model(**input_)
-#                     torch.cuda.synchronize()
-#                     et = time.perf_counter () - st 
-#                     print (f"Time fot one inference = {et} s")
-#                 prof.step()
-        
-#         if (export): 
-#             prof.export_chrome_trace(f"{model_name}.json")
-        
-#         os.system(f"mkdir -p {out_dir}")
 
-#         filename = f"{out_dir}/{model_name}.csv"
-#         _analyze_prof (prof, filename, custom)
-
-# @torch.no_grad()
-# def profile_model_generate (model_name, 
-#                     model, 
-#                     input_, 
-#                     max_tokens_,
-#                     custom_ops_list, 
-#                     num_prof_runs, 
-#                     device, 
-#                     dynamo = False, 
-#                     out_dir = "./non-gemm-out/", 
-#                     export = True): 
-
-#     skip_first, wait, warmup, active = 1,2, 2, num_prof_runs
-#     schedule = torch.profiler.schedule(skip_first =skip_first, wait = wait, warmup = warmup, active = active)
-#     device = device if torch.cuda.is_available() else 'cpu'
-#     mem_prof = False
-#     dynamo = dynamo 
-#     custom = True
-#     if (custom):
-#         #model = model.apply(replace_forward)
-#         ops = ["conv1d"]
-#         model.model = model.model.apply(lambda module: replace_forward(module, custom_ops_list))
-#         custom = False
-#     #assert (len(input_list) == skip_first + wait + warmup + active)
-#     inputs_warmup = {
-#         'input_ids':torch.randint(1,5000, (1,2)),
-#         'attention_mask':torch.ones(1,2)
-#     }
-#     max_tokens_warmup = 4
-#     max_tokens = max_tokens_warmup
-#     inputs = inputs_warmup
-#     record_function = "Warmup"
-#     with torch.profiler.profile(schedule = schedule, profile_memory=mem_prof) as prof:
-#             for n in range (skip_first + wait + warmup + active):
-#                 print (f"Profiling Iteration {n}")
-#                 with torch.profiler.record_function(record_function):
-#                     st = time.perf_counter()
-#                     out = model.generate(**inputs, max_new_tokens = max_tokens)
-                   
-#                     if torch.cuda.is_available():
-#                         torch.cuda.synchronize()
-#                     et = time.perf_counter () - st 
-#                     print (f"Time fot one inference = {et} s")
-#                 prof.step()
-#                 del out
-#                 inputs, max_tokens, record_function = (input_, max_tokens_, "Inference_prof") if (n >=  skip_first + wait + warmup - 1) else (inputs, max_tokens_warmup, record_function)
-#                 gc.collect
-    
-    
-#     out_dir = f'{out_dir}/{model_name}'    
-#     os.system(f"mkdir -p {out_dir}") 
-    
-    
-#     if (export): 
-#         prof.export_chrome_trace(f"{out_dir}/{model_name}.json")
-    
-
-#     filename = f"{out_dir}/{model_name}.csv"
-#     _analyze_prof (prof, filename, custom)
-############################
 def main(): 
     profile_hf_lm_model("raed", "gpt2-large", None, False, "cuda", "./non-gemm-out", True) 
     
-    #model = torchvision.models.vit_b_16().to(torch.float16)
     custom = False ## Determines Granurality of Profile, if you need coarser grain information at the torch.nn.module set to True
-    #profile_model (model, "vit-b16", 'cuda', torch.randn(1,3,224,224).to(torch.float16), custom,True, './non-gemm-out')
-    #profile_softmax ("softmax", "softmax", 'cuda', torch.randn(1,64).to(torch.float16), custom,True, './out')
 
 
 
 if __name__ =="__main__": 
     main()
-    #generate_report("out/vit-b16.csv")
     print ("Done")

@@ -9,11 +9,13 @@
 
 **ISPASS 2026 — Artifact Evaluation**
 
+[![arXiv](https://img.shields.io/badge/arXiv-2507.12442-b31b1b.svg?style=for-the-badge)](https://arxiv.org/abs/2507.12442)
+[![Project Page](https://img.shields.io/badge/Project%20Page-4c8eda.svg?style=for-the-badge)](https://sapmitra.github.io/ssm-scope/)
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.10](https://img.shields.io/badge/Python-3.10-blue.svg)](https://www.python.org/downloads/release/python-31020/)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.6%2B-ee4c2c.svg)](https://pytorch.org/)
 [![CUDA](https://img.shields.io/badge/CUDA-12.x-76b900.svg)](https://developer.nvidia.com/cuda-toolkit)
-[![arXiv](https://img.shields.io/badge/arXiv-2507.12442-b31b1b.svg)](https://arxiv.org/abs/2507.12442)
 
 </div>
 
@@ -45,7 +47,7 @@
 <p align="center">
   <img src=".github/memory_footprint_6-1.png" alt="GPU Memory Footprint — Transformer vs SSM vs Hybrid across sequence lengths" width="820">
   <br>
-  <sub><b>Fig 5:</b> Peak GPU memory footprint vs sequence length across Transformer, SSM, and Hybrid model families — RTX 4090 (left) &amp; NVIDIA Jetson Nano Orin (right).</sub>
+  <sub><b>Fig 5:</b> GPU memory footprint vs sequence length across Transformer, SSM, and Hybrid model families — RTX 4090 (top) &amp; Jetson Nano (bottom).</sub>
 </p>
 
 ---
